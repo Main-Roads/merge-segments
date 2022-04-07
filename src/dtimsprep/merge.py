@@ -100,6 +100,13 @@ def on_slk_intervals(target: pd.DataFrame, data: pd.DataFrame, join_left: List[s
 	if not isinstance(join_left, list):
 		raise Exception("Parameter `join_left` must be a list literal. Tuples and other sequence types will lead to cryptic errors from pandas.")
 	
+	# prevent confusing error if user accidentally passes in a series instead of a dataframe
+	if not isinstance(data, pd.DataFrame):
+		raise TypeError(f"`data` parameter must be a pandas dataframe, received data of type {type(data)}")
+		
+	if not isinstance(target, pd.DataFrame):
+		raise TypeError(f"`target` parameter must be a pandas dataframe, received target of type {type(target)}")
+
 	# prevent doing a lot of work then getting an error from pandas 
 	# join about not specifying a suffix for overlapping column names
 	for column_action in column_actions:
@@ -123,6 +130,8 @@ def on_slk_intervals(target: pd.DataFrame, data: pd.DataFrame, join_left: List[s
 			"Specified columns must be present and have matching names in both `target` and `data`:\n"
 			"\n".join(missing_columns)
 		)
+
+	
 
 	# ReIndex data for faster O(N) lookup
 	data = data.assign(data_id=data.index)
