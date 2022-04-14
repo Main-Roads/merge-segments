@@ -174,28 +174,52 @@ numpy and should not be relied upon to stay consistent in the future. Any random
 segment may be chosen:
 
 ```text
-Target Segment:       |===========================|
-Data Segments:        |==33==|==55==|==66==|==77==|
-KeepLongest:             33
+Target Segment:       |==========================|
+Data Segments:        |== 33 ==|== 55 ==|== 66 ==|== 77 ==|
+KeepLongest:          |== 33 ====================|
 ```
 
 **Note 2:** If the data to be merged has several short segments with the same
-value, which together form the 'longest' value then this longest value will be
-selected. For example in the situation below the data segment `55` is the
-longest individual *segment*, but `99` is the longest *value*. The result is
-therefore `99`.
+value, which together form the 'longest' value then this longest non-missing
+value will be selected. For example in the situation below the data segment `55`
+is the longest individual *segment*, but `99` is the longest *value*. The result
+is therefore `99`.
 
 ```text
-Target Segment:          |==============================|
+Target Segment:          |================================|
 Data segment:      |=======55=======|==99==|==99==|==99==|==11==|
-KeepLongest:                           99
+KeepLongest:             |=============99=================|
 ```
 
-**Note 3:** No rounding is performed to facilitate the behaviour described in
-Note 2. Data must be pre-processed if it is expected that floating point
-weirdness will cause misbehaviour for the KeepLongest aggregation. Internally
-the pandas Series.groupby() function is used to choose the longest segment by
-grouping by segment values.
+**Note 3:** Continuity of the data in `KeepLongest` is not considered. In the following
+example the value 55 is the longest *continuous* overlapping value, but the
+output 99 is selected because it is still the longest overlapping value
+*when ignoring continuity*.
+
+```text
+Target Segment:          |==================================|
+Data segment:          |==99==|======55======|==99==|==99==|==99==|==11==|
+KeepLongest:             |=============99===================|
+```
+
+
+**Note 4:** Blank (`numpy.nan`) values are not considered when looking for the longest
+value. In the following example the `KeepLongest` will keep the value 55, even
+though the longest overlapping value is `numpy.nan`
+```text
+Target Segment:          |=======================================|
+Data segment:       |=== nan ===|== 55 ==|== nan ==|== nan ==|== nan ==|
+KeepLongest:             |========= 55 ==========================|
+```
+
+**Note 5:** No rounding is performed to facilitate the behaviour described in
+Notes 2, 3 and 4. Data must be pre-processed if it is expected that issues
+regarding floating point number equality (ie `1.0 == 0.99999999999999999`) will
+cause misbehaviour for the `KeepLongest` aggregation. Internally the `pandas`
+`Series.groupby()` function is used to choose the longest segment by grouping by
+segment values. Actual behaviour will depend on how that function is implemented
+internally.
+
 
 ### 3.4. Practical Example of Merge
 
