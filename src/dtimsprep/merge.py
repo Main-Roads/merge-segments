@@ -107,6 +107,25 @@ def on_slk_intervals(target: pd.DataFrame, data: pd.DataFrame, join_left: List[s
 	if not isinstance(target, pd.DataFrame):
 		raise TypeError(f"`target` parameter must be a pandas dataframe, received target of type {type(target)}")
 
+	# prevent an error that occurs when the secondary dataframe has a multi index;
+	# TODO: why does it even happen in the first place?
+	if isinstance(target.index, pd.MultiIndex):
+		raise Exception("the `target` dataframe uses a `pandas.MultiIndex` which is not currently supported. please use reset_index() to revert to a normal index.")
+	if isinstance(data.index, pd.MultiIndex):
+		raise Exception("the `data` dataframe uses a `pandas.MultiIndex` which is not currently supported. please use reset_index() to revert to a normal index.")
+	if isinstance(target.columns, pd.MultiIndex):
+		raise Exception("the `target` dataframe uses a `pandas.MultiIndex` for a column index which is not currently supported.")
+	if isinstance(data.columns, pd.MultiIndex):
+		raise Exception("the `data` dataframe uses a `pandas.MultiIndex` for a column index which is not currently supported.")
+	if target.index.has_duplicates:
+		raise Exception("`target` dataframe has a duplicated index. please use `reset_index()` to fix.")
+	if data.index.has_duplicates:
+		raise Exception("`data` dataframe has a duplicated index. please use `reset_index()` to fix.")
+	if target.columns.has_duplicates:
+		raise Exception("`target` dataframe has a duplicated column names.")
+	if data.columns.has_duplicates:
+		raise Exception("`data` dataframe has a duplicated column names.")
+
 	# prevent doing a lot of work then getting an error from pandas 
 	# join about not specifying a suffix for overlapping column names
 	for column_action in column_actions:
