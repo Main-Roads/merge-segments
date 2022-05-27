@@ -151,16 +151,19 @@ result = merge.on_slk_intervals(
 
 The following merge aggregations are supported:
 
-| Constructor                                                   | Purpose                                                                                                                                                               |
-| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `merge.Aggregation.First()`                                   | Keep the first non-blank value.                                                                                                                                       |
-| `merge.Aggregation.KeepLongest()`                             | Keep the longest non-blank value. see notes below                                                                                                                     |
-| `merge.Aggregation.LengthWeightedAverage()`                   | Compute the length weighted average of non-blank values                                                                                                               |
-| `merge.Aggregation.Average()`                                 | Compute the average non-blank value                                                                                                                                   |
-| `merge.Aggregation.LengthWeightedPercentile(percentile=0.75)` | Compute the length weighted percentile (see description of method below). Value should be between 0.0 and 1.0. 0.75 means 75th percentile.                            |
-| `merge.Aggregation.ProportionalSum()`                         | Compute the sum of all data overlapping the target segment; The value of each segment is multiplied by the proportion of that segment overlapping the target segment. |
-| `merge.Aggregation.Sum()`                                     | Compute the sum of all data overlapping the target segment.                                                                                                           |
-| `merge.Aggregation.IndexOfMax()`                              | Return the row-index in the `data` with the maximum value.                                                                                                            |
+| Constructor                                                   | Purpose                                                                                                                                                                           |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `merge.Aggregation.First()`                                   | Keep the first non-blank value.                                                                                                                                                   |
+| `merge.Aggregation.KeepLongest()`                             | Keep the longest non-blank value. see notes below                                                                                                                                 |
+| `merge.Aggregation.LengthWeightedAverage()`                   | Compute the length weighted average of non-blank values                                                                                                                           |
+| `merge.Aggregation.Average()`                                 | Compute the average non-blank value                                                                                                                                               |
+| `merge.Aggregation.LengthWeightedPercentile(percentile=0.75)` | Compute the length weighted percentile (see description of method below). Value should be between 0.0 and 1.0. 0.75 means 75th percentile.                                        |
+| `merge.Aggregation.ProportionalSum()`                         | Compute the sum of all data overlapping the target segment; The value of each segment is multiplied by the proportion of that segment overlapping the target segment.             |
+| `merge.Aggregation.Sum()`                                     | Compute the sum of all data overlapping the target segment.                                                                                                                       |
+| `merge.Aggregation.Min()`                                     | The minimum value in `data` which overlaps the segment in `target`.                                                                                                               |
+| `merge.Aggregation.Max()`                                     | The maximum value in `data` which overlaps the segment in `target`.                                                                                                               |
+| `merge.Aggregation.IndexOfMin()`                              | The row-index in the `data` with the minimum value. After merging the index can be used to fetch things like `"Surface Type"` of `"Oldest Surface"` (ie minimum `"Surface Year"`) |
+| `merge.Aggregation.IndexOfMax()`                              | The row-index in the `data` with the maximum value.                                                                                                                               |
 
 #### 3.3.1. Notes about `Aggregation.KeepLongest()`
 

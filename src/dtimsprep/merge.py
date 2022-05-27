@@ -16,12 +16,15 @@ class AggregationType(Enum):
 	ProportionalSum = 7
 	Sum = 8
 	IndexOfMax = 9
+	IndexOfMin = 10
+	Min = 11
+	Max = 12
 
 
 class Aggregation:
 	
 	def __init__(self, aggregation_type: AggregationType, percentile: Optional[float] = None):
-		"""Don't use initialise this class directly, please use one of the static factory functions above"""
+		"""Don't initialise this class directly, please use one of the static factory functions"""
 		self.type: AggregationType = aggregation_type
 		self.percentile: Optional[float] = percentile
 		pass
@@ -71,13 +74,24 @@ class Aggregation:
 
 	@staticmethod
 	def IndexOfMax():
-		"""This is the row label of the maximum value detected in the data"""
+		"""The index (or row label) of the `data` DataFrame, of the maximum overlapping segment"""
 		return Aggregation(AggregationType.IndexOfMax)
+	
+	@staticmethod
+	def IndexOfMin():
+		"""The index (or row label) of the `data` DataFrame, of the minimum overlapping segment"""
+		return Aggregation(AggregationType.IndexOfMin)
 
-	# @staticmethod
-	# def SumLengthWeightedAveragePerCategory(category_column_name:str):
-	# 	"""For the set of data matching a target row, get the length weighted average for each category, then sum the results."""
-	# 	return Aggregation(AggregationType.IndexOfMax)
+	@staticmethod
+	def Max():
+		"""Value of the maximum overlapping segment"""
+		return Aggregation(AggregationType.Max)
+	
+	@staticmethod
+	def Min():
+		"""Value of the minimum overlapping segment"""
+		return Aggregation(AggregationType.Min)
+
 
 class Action:
 	def __init__(
@@ -276,9 +290,20 @@ def on_slk_intervals(target: pd.DataFrame, data: pd.DataFrame, join_left: List[s
 					aggregated_result_row.append(
 						column_to_aggregate.idxmax()
 					)
+				elif column_action.aggregation.type == AggregationType.IndexOfMin:
+					aggregated_result_row.append(
+						column_to_aggregate.idxmin()
+					)
+				elif column_action.aggregation.type == AggregationType.Max:
+					aggregated_result_row.append(
+						column_to_aggregate.max()
+					)
+				elif column_action.aggregation.type == AggregationType.Min:
+					aggregated_result_row.append(
+						column_to_aggregate.min()
+					)
 				
-				# elif column_action.aggregation.type == AggregationType.SumMaxPerCategory:
-				# 	column_to_aggregate.index
+				
 			
 			result_index.append(target_index)
 			result_rows.append(aggregated_result_row)

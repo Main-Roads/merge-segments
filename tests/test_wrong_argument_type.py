@@ -19,6 +19,8 @@ def test_wrong_argument_type():
 		]
 	)
 
+	# null test omitted, some other test will fail.
+
 	# This should raise an exception since target is a series
 	with pytest.raises(TypeError, match="`target` parameter must be a pandas dataframe"):
 		merge.on_slk_intervals(
