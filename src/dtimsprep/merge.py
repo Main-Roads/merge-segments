@@ -140,6 +140,8 @@ def on_slk_intervals(target: pd.DataFrame, data: pd.DataFrame, join_left: List[s
 		raise Exception("`target` dataframe has a duplicated column names.")
 	if data.columns.has_duplicates:
 		raise Exception("`data` dataframe has a duplicated column names.")
+	
+	
 
 	# prevent doing a lot of work then getting an error from pandas 
 	# join about not specifying a suffix for overlapping column names
@@ -165,7 +167,11 @@ def on_slk_intervals(target: pd.DataFrame, data: pd.DataFrame, join_left: List[s
 			"\n".join(missing_columns)
 		)
 
-	
+	# prevent execution if there are zero-length rows
+	if (data[slk_from]==data[slk_to]).any():
+		raise Exception("`data` dataframe has rows where from=to. The merge tool does not work with zero length segments. Please adjust to give the segments some length.")
+	if (target[slk_from]==target[slk_to]).any():
+		raise Exception("`target` dataframe has rows where from=to. The merge tool does not work with zero length segments. Please adjust to give the segments some length.")
 
 	# ReIndex data for faster O(N) lookup
 	data = data.assign(data_id=data.index)
