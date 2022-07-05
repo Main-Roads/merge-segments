@@ -35,7 +35,7 @@ class Aggregation:
 	
 	@staticmethod
 	def KeepLongestSegment():
-		print("WARNING KeepLongestSegment is deprecated please do not use this function. it is kept here for testing but is to be removed in future versions.")
+		print("WARNING `KeepLongestSegment` is deprecated, please use `KeepLongest` instead.\n`KeepLongestSegment` kept here temporarily for testing purposes but is will be removed in future versions.")
 		return Aggregation(AggregationType.KeepLongestSegment)
 	
 	@staticmethod
