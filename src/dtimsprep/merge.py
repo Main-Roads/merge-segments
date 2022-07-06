@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Optional, List, Tuple
+from deprecated import deprecated
 
 import numpy as np
 import pandas
@@ -7,18 +8,19 @@ import pandas as pd
 
 
 class AggregationType(Enum):
-	KeepLongestSegment = 1  # Deprecated
-	KeepLongest = 2
-	Average = 3
-	LengthWeightedAverage = 4
+	KeepLongestSegment       = 1 # Deprecated
+	KeepLongest              = 2
+	Average                  = 3
+	LengthWeightedAverage    = 4
 	LengthWeightedPercentile = 5
-	First = 6
-	ProportionalSum = 7
-	Sum = 8
-	IndexOfMax = 9
-	IndexOfMin = 10
-	Min = 11
-	Max = 12
+	First                    = 6
+	SumProportionOfData      = 7
+	SumProportionOfTarget    = 8
+	Sum                      = 9
+	IndexOfMax               = 10
+	IndexOfMin               = 11
+	Min                      = 12
+	Max                      = 13
 
 
 class Aggregation:
@@ -34,8 +36,12 @@ class Aggregation:
 		return Aggregation(AggregationType.First)
 	
 	@staticmethod
+	@deprecated(version="0.1.0", reason="`merge.Aggregation.KeepLongestSegment()` is an old, incorrect implementation. Please use `merge.Aggregation.KeepLongest()`")
 	def KeepLongestSegment():
-		print("WARNING `KeepLongestSegment` is deprecated, please use `KeepLongest` instead.\n`KeepLongestSegment` kept here temporarily for testing purposes but is will be removed in future versions.")
+		"""
+		DEPRECATED: Please use `KeepLongest()` instead.
+		"""
+		#print("WARNING `KeepLongestSegment` is deprecated, please use `KeepLongest` instead.\n`KeepLongestSegment` kept here temporarily for testing purposes but is will be removed in future versions.")
 		return Aggregation(AggregationType.KeepLongestSegment)
 	
 	@staticmethod
@@ -48,10 +54,38 @@ class Aggregation:
 	
 	@staticmethod
 	def Average():
+		"""
+		The average non-blank overlapping value. If all overlapping values are blank, keep blank.
+		"""
 		return Aggregation(AggregationType.Average)
 	
 	@staticmethod
 	def LengthWeightedPercentile(percentile: float):
+		"""
+		The length weighted percentile of overlapping values.
+		This is similar to a normal percentile calculation, but the length of the overlapping segment is taken into account.
+
+		There is a complicated sort-by-Value, followed by an interpolation step.
+		In the following diagram the `x` shows the value of the 75th percentile.
+		The `x` is at 75% of the total length (chainage/SLK length) of all overlapping values
+		(not including the length of half the first segment and half the last segment)
+		and is interpolated between center-point/ value `.` of the last two segments:
+		
+		```text
+		      |                          _._
+		      |                         |   |
+		      |                      x  |   |
+		Value |              _____._____|   |
+		      |        __.__|           |   |
+		      |       |     |           |   |
+		      |  __.__|     |           |   |
+		      | |     |     |           |   |
+		           |<-----SLK Length----->|
+		           0%                ↑   100%
+		                             │
+		      75th Percentile ───────┘
+		```
+		"""
 		if percentile > 1.0 or percentile < 0.0:
 			raise ValueError(
 				f"Percentile out of range. Must be greater than 0.0 and less than 1.0. Got {percentile}." +
@@ -63,9 +97,39 @@ class Aggregation:
 		)
 	
 	@staticmethod
+	@deprecated(version="0.4.3", reason="Aggregation type is renamed; Please use `Aggregation.SumProportionOfData()` for equivalent behaviour.")
 	def ProportionalSum():
-		"""This is the sum of values overlapping the target segment; The value of each segment is multiplied by the proportion of that segment overlapping the target segment."""
-		return Aggregation(AggregationType.ProportionalSum)
+		"""
+		DEPRECATED: Please use `merge.Aggregation.SumProportionOfData()` for equivalent behaviour. `ProportionalSum()` will be removed in the future.
+		
+		The sum of all overlapping `data` segments,
+		where the value of each overlapping segment is multiplied by
+		the length of the overlap divided by the length of the `data` segment.
+		This is the same behaviour as the old VBA macro.
+		See also `SumProportionOfTarget()`
+		"""
+		return Aggregation(AggregationType.SumProportionOfData)
+
+	@staticmethod
+	def SumProportionOfTarget():
+		"""
+		The sum of all overlapping `data` segments,
+		where the value of each overlapping segment is multiplied by
+		the length of the overlap divided by the length of the `target` segment.
+		See also `SumProportionOfData()`
+		"""
+		return Aggregation(AggregationType.SumProportionOfTarget)
+
+	@staticmethod
+	def SumProportionOfData():
+		"""
+		The sum of all overlapping `data` segments,
+		where the value of each overlapping segment is multiplied by
+		the length of the overlap divided by the length of the `data` segment.
+		This is the same behaviour as the old VBA macro.
+		See also `SumProportionOfTarget()`
+		"""
+		return Aggregation(AggregationType.SumProportionOfData)
 
 	@staticmethod
 	def Sum():
@@ -300,11 +364,16 @@ def on_slk_intervals(target: pd.DataFrame, data: pd.DataFrame, join_left: List[s
 					)
 					aggregated_result_row.append(result)
 
-				elif column_action.aggregation.type == AggregationType.ProportionalSum:
-					# total_overlap_length = column_to_aggregate_overlap_len.sum()
+				elif column_action.aggregation.type == AggregationType.SumProportionOfData:
 					data_to_aggregate_for_target_group_slk_length = data_to_aggregate_for_target_group[slk_to]-data_to_aggregate_for_target_group[slk_from]
 					aggregated_result_row.append(
 						(column_to_aggregate * column_to_aggregate_overlap_len/data_to_aggregate_for_target_group_slk_length).sum()
+					)
+
+				elif column_action.aggregation.type == AggregationType.SumProportionOfTarget:
+					data_to_aggregate_for_target_group_slk_length = data_to_aggregate_for_target_group[slk_to]-data_to_aggregate_for_target_group[slk_from]
+					aggregated_result_row.append(
+						(column_to_aggregate * column_to_aggregate_overlap_len/(target_row[slk_to] - target_row[slk_from])).sum()
 					)
 				
 				elif column_action.aggregation.type == AggregationType.Sum:
@@ -316,14 +385,17 @@ def on_slk_intervals(target: pd.DataFrame, data: pd.DataFrame, join_left: List[s
 					aggregated_result_row.append(
 						column_to_aggregate.idxmax()
 					)
+
 				elif column_action.aggregation.type == AggregationType.IndexOfMin:
 					aggregated_result_row.append(
 						column_to_aggregate.idxmin()
 					)
+
 				elif column_action.aggregation.type == AggregationType.Max:
 					aggregated_result_row.append(
 						column_to_aggregate.max()
 					)
+
 				elif column_action.aggregation.type == AggregationType.Min:
 					aggregated_result_row.append(
 						column_to_aggregate.min()
