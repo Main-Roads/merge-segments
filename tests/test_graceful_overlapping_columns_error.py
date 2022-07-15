@@ -30,7 +30,7 @@ def test_graceful_overlapping_columns_error():
 			data          = data,
 			join_left     = ["road", "cwy"],
 			column_actions= [
-				merge.Action('measure',  aggregation=merge.Aggregation.KeepLongestSegment()),
+				merge.Action('measure',  aggregation=merge.Aggregation.KeepLongest()),
 			],
 			from_to=("slk_from", "slk_to"),
 		)
@@ -42,7 +42,7 @@ def test_graceful_overlapping_columns_error():
 			data          = data,
 			join_left     = ["road", "cwy"],
 			column_actions= [
-				merge.Action('category', rename="measure", aggregation=merge.Aggregation.KeepLongestSegment()),
+				merge.Action('category', rename="measure", aggregation=merge.Aggregation.KeepLongest()),
 			],
 			from_to=("slk_from", "slk_to"),
 		)
@@ -52,7 +52,7 @@ def test_graceful_overlapping_columns_error():
 		data          = data,
 		join_left     = ["road", "cwy"],
 		column_actions= [
-			merge.Action('measure', rename="measure_1", aggregation=merge.Aggregation.KeepLongestSegment()),
+			merge.Action('measure', rename="measure_1", aggregation=merge.Aggregation.KeepLongest()),
 		],
 		from_to=("slk_from", "slk_to"),
 	)

@@ -61,7 +61,7 @@ def plot_dist(ax: plt.Axes, df, title=None, height=None):
 			ax.text(
 				patch.get_x() + patch.get_width() / 2,
 				patch.get_y() + patch.get_height(),
-				np.nan if np.isnan(draw_height) else str(round(draw_height * 100) / 100),
+				"nan" if np.isnan(draw_height) else str(round(draw_height * 100) / 100),
 				va="bottom",
 				ha="center",
 				fontdict={"size": 8}
@@ -79,12 +79,11 @@ def plot_seg_vs_merged(seg, dat, test_name):
 			merge.Action(cn.value, merge.Aggregation.LengthWeightedPercentile(0.5), rename="50th percentile"),
 			merge.Action(cn.value, merge.Aggregation.Average(), rename="Average"),
 			merge.Action(cn.value, merge.Aggregation.First(), rename="First"),
-			merge.Action(cn.value, merge.Aggregation.ProportionalSum(), rename="PropSum")
+			merge.Action(cn.value, merge.Aggregation.SumProportionOfData(), rename="PropSum")
 		],
 		from_to=("slk_from", "slk_to"),
 	)
 	
-	fig:plt.Figure
 	fig, axs = plt.subplots(2, 4, sharex='all', sharey='all')
 	
 	fig.set_size_inches(w=16.5, h=11.7)

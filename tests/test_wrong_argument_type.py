@@ -29,7 +29,7 @@ def test_wrong_argument_type():
 			join_left     = ["road", "cwy"],
 			from_to       = ("slk_from", "slk_to"),
 			column_actions= [
-				merge.Action('measure',  rename="measure longest segment",  aggregation=merge.Aggregation.KeepLongestSegment()),
+				merge.Action('measure',  rename="measure longest segment",  aggregation=merge.Aggregation.KeepLongest()),
 			],
 		)
 	
@@ -41,6 +41,6 @@ def test_wrong_argument_type():
 			join_left     = ["road", "cwy"],
 			from_to       = ("slk_from", "slk_to"),
 			column_actions= [
-				merge.Action('measure',  rename="measure longest segment",  aggregation=merge.Aggregation.KeepLongestSegment()),
+				merge.Action('measure',  rename="measure longest segment",  aggregation=merge.Aggregation.KeepLongest()),
 			],
 		)

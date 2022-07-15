@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 import dtimsprep.merge as merge
 
 
@@ -38,14 +39,17 @@ def test_keep_longest():
 		]
 	)
 
+	with pytest.deprecated_call():
+		deprecated_keep_longest_segment = merge.Aggregation.KeepLongestSegment()
+
 	res = merge.on_slk_intervals(
 		segments,
 		data,
 		["road", "cwy"],
 		[
-			merge.Action('measure',  rename="measure longest segment",  aggregation=merge.Aggregation.KeepLongestSegment()),
+			merge.Action('measure',  rename="measure longest segment",  aggregation=deprecated_keep_longest_segment),
 			merge.Action('measure',  rename="measure longest value",    aggregation=merge.Aggregation.KeepLongest()),
-			merge.Action('category', rename="category longest segment", aggregation=merge.Aggregation.KeepLongestSegment()),
+			merge.Action('category', rename="category longest segment", aggregation=deprecated_keep_longest_segment),
 			merge.Action('category', rename="category longest value",   aggregation=merge.Aggregation.KeepLongest()),
 		],
 		from_to=("slk_from", "slk_to"),
