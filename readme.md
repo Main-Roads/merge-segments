@@ -11,24 +11,23 @@
   - [3.4. Practical Example of Merge](#34-practical-example-of-merge)
 - [4. Notes](#4-notes)
   - [4.1. Correctness, Robustness, Test Coverage and Performance](#41-correctness-robustness-test-coverage-and-performance)
-  - [4.2. Known Issues](#42-known-issues)
 
 ## 1. Introduction
 
 `dtimsprep` is a python package useful in the preparation of data for the dTIMS
 modelling process.
 
-Currently only the `merge` module is included, but other modules may be added in the future.
+Currently only the `merge` module is included, but other modules may be added in
+the future.
 
-There is an ongoing effort to accelerate and parallelise the merge function under a new repo called [megamerge](https://github.com/thehappycheese/megamerge)
+There is an ongoing effort to accelerate and parallelise the merge function
+under a new repo called
+[megamerge](https://github.com/thehappycheese/megamerge)
 
 ### 1.1. Dependencies
 
 This package depends on Pandas (tested with version 1.3.1) and is most likely to
-work as expected in Python 3.7+.
-
-Note that currently the `pip install` command will not try to install these
-dependencies because I have not added them to the `setup.cfg` file yet.
+work as expected in Python 3.9+.
 
 ## 2. Install, Upgrade, Uninstall
 
@@ -222,7 +221,7 @@ regarding floating point number equality (ie `1.0 == 0.99999999999999999`) will
 cause misbehaviour for the `KeepLongest` aggregation. Internally the `pandas`
 `Series.groupby()` function is used to choose the longest segment by grouping by
 segment values. Actual behaviour will depend on how that function is implemented
-internally.
+by `pandas` internal code.
 
 
 ### 3.4. Practical Example of Merge
@@ -313,20 +312,29 @@ segmentation_pavement.to_csv("output.csv")
 This package aims to be as robust as its predecessor; an old VBA Excel Macro.
 The old Macro is well trusted and has a proven track record.
 
-In Pandas/Python there are some trade-offs to be made between robustness and performance:
-The more checking is done for malformed input data, the slower the algorithm. Some known issues are discussed in the `Known Issues` section below.
+The merge function performs several checks before proceeding:
 
-However, if input data is well formed, then we can test to make sure we get correct outputs.
-Currently there is a limited suit of tests which run using the `pytest` library.
+- Some checking for correct parameter datatypes (ie target is a `DataFrame`, not a `Series`)
+- `MultiIndex` `DataFrame`s are not permitted.
+  - Originally this module was designed to work well with `MultiIndex`s but
+    there are many unexpected situations where this causes cryptic warnings,
+    misbehaviour, or even errors. I blame `pandas` for this, since in most cases
+    these issues arise from un/poorly-documented pandas behaviour.
+- Duplicates in the index
+- Clashing column names
 
-- About 50% of the total functionality is tested
-- The other 50% has been extensively hand checked to confirm outputs are as expected.
+This list is not exhaustive, since there are many errors which can arise from
+malformed input data. We can't catch them all!
 
-### 4.2. Known Issues
+However, if we assume input data is well formed, then we can test to make sure
+we get correct outputs. Currently there is a limited suit of tests which run
+using the `pytest` library.
 
-- If the values of `slk_from` > `slk_to` in either the data or the target segmentation, the merge will create invalid output.
-- Dependencies are not installed by pip because I have not added them to `setup.cfg` yet.
-- Probably the class `merge.Action` should be renamed to `merge.Column` to improve readability.
-- Performance is relatively poor, in the future, performance optimisations could be explored
-  - column-wise parallelism
-  - building a Rust python module
+- About 70% of the total functionality is tested
+- The other 30% has been extensively hand checked to confirm outputs are as expected.
+
+Finally, performance is relatively poor, in the future, performance
+optimisations could be explored
+
+- column-wise parallelism
+- building a Rust python module (see https://github.com/thehappycheese/megamerge)
