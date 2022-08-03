@@ -66,24 +66,24 @@ class Aggregation:
 		This is similar to a normal percentile calculation, but the length of the overlapping segment is taken into account.
 
 		There is a complicated sort-by-Value, followed by an interpolation step.
-		In the following diagram the `x` shows the value of the 75th percentile.
-		The `x` is at 75% of the total length (chainage/SLK length) of all overlapping values
+		In the following diagram the `▴` shows the value of the 75th percentile.
+		The `▴` is at 75% of the total length (chainage/SLK length) of all overlapping values
 		(not including the length of half the first segment and half the last segment)
-		and is interpolated between center-point/ value `.` of the last two segments:
+		and is interpolated between center-point values (`○`) of the last two segments:
 		
 		```text
-		      |                          _._
+		      |                          _○_
 		      |                         |   |
-		      |                      x  |   |
-		Value |              _____._____|   |
-		      |        __.__|           |   |
+		      |                      ▴  |   |   <---- 75th percentile value
+		Value |              _____○_____|   |
+		      |        __○__|           |   |
 		      |       |     |           |   |
-		      |  __.__|     |           |   |
+		      |  __○__|     |           |   |
 		      | |     |     |           |   |
 		           |<-----SLK Length----->|
 		           0%                ↑   100%
 		                             │
-		      75th Percentile ───────┘
+		      75th percentile ───────┘
 		```
 		"""
 		if percentile > 1.0 or percentile < 0.0:
@@ -116,6 +116,22 @@ class Aggregation:
 		The sum of all overlapping `data` segments,
 		where the value of each overlapping segment is multiplied by
 		the length of the overlap divided by the length of the `target` segment.
+		
+		This aggregation method is suitable when aggregating columns measured in
+		`Units per Kilometre` or `% of length`. The aggregated value will have the same unit.
+		The assumption is that the % of length is spread evenly across the whole data segment.
+		(This aggregation was created to deal with the cracking dataset which is given in 10 metre segments with a % cracked.
+		Note that a better aggregation should be used if there is concern regarding the relative width between the `data` and `target` segments)
+
+		The result below is calculated as `result = (20%*10 + 40%*5)/40 = 10%`
+
+		```text
+		data   :   |-- len=20---value=20% --|                 |----------------------- len=50 --- value=40% ----------------|
+		target :              |------------- len=40 ------------------|
+		overlap:              |--- len=10 --|                 |-len=5-|
+		result :              |------------ value=10% ----------------|
+		```
+		
 		See also `SumProportionOfData()`
 		"""
 		return Aggregation(AggregationType.SumProportionOfTarget)
@@ -371,9 +387,10 @@ def on_slk_intervals(target: pd.DataFrame, data: pd.DataFrame, join_left: List[s
 					)
 
 				elif column_action.aggregation.type == AggregationType.SumProportionOfTarget:
-					data_to_aggregate_for_target_group_slk_length = data_to_aggregate_for_target_group[slk_to]-data_to_aggregate_for_target_group[slk_from]
+					# data_to_aggregate_for_target_group_slk_length = data_to_aggregate_for_target_group[slk_to]-data_to_aggregate_for_target_group[slk_from]
+					target_length = target_row[slk_to] - target_row[slk_from]
 					aggregated_result_row.append(
-						(column_to_aggregate * column_to_aggregate_overlap_len/(target_row[slk_to] - target_row[slk_from])).sum()
+						(column_to_aggregate * column_to_aggregate_overlap_len).sum()/target_length
 					)
 				
 				elif column_action.aggregation.type == AggregationType.Sum:
