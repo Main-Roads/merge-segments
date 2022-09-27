@@ -271,6 +271,7 @@ def on_slk_intervals(target: pd.DataFrame, data: pd.DataFrame, join_left: List[s
 
 	
 	# Main Loop
+	# TODO: address pandas warning regarding groupers with length of 1; will not return a tuple. Annoying, why?
 	for target_group_index, target_group in target_groups:
 		try:
 			data_matching_target_group = data.loc[target_group_index]
