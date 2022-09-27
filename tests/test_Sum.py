@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import dtimsprep.merge as merge
+import merge_segments.merge as merge
 
 
 def test_Sum():

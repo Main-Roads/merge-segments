@@ -32,25 +32,25 @@ work as expected in Python 3.9+.
 To install:
 
 ```powershell
-pip install "https://github.com/thehappycheese/dtimsprep/zipball/main/"
+pip install "https://github.com/thehappycheese/merge-segments/zipball/main/"
 ```
 
 To Upgrade:
 
 ```powershell
-pip install --upgrade "https://github.com/thehappycheese/dtimsprep/zipball/main"
+pip install --upgrade "https://github.com/thehappycheese/merge-segments/zipball/main"
 ```
 
 To show installed version:
 
 ```powershell
-pip show dtimsprep
+pip show merge_segments
 ```
 
 To remove:
 
 ```powershell
-pip uninstall dtimsprep
+pip uninstall merge_segments
 ```
 
 ## 3. Module `merge`
@@ -61,7 +61,7 @@ The following code demonstrates `merge.on_slk_intervals()` by merging the dummy
 dataset `pavement_data` against the target `segmentation` dataframe.
 
 ```python
-import dtimsprep.merge as merge
+import merge_segments.merge as merge
 
 segmentation = pd.DataFrame(
     columns=["road_no", "carriageway", "slk_from", "slk_to"],
@@ -125,7 +125,7 @@ Normally this would only ever be used as part of a call to the
 `on_slk_intervals` function as shown below:
 
 ```python
-import dtimsprep.merge as merge
+import merge_segments.merge as merge
 
 result = merge.on_slk_intervals(
     ..., 
@@ -226,7 +226,7 @@ by `pandas` internal code.
 
 ```python
 import pandas as pd
-import dtimsprep.merge as merge
+import merge_segments.merge as merge
 
 # =====================================================
 # Use a data class to hold some standard column names

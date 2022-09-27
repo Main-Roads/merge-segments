@@ -3,7 +3,7 @@ def test_min_max_argmin_argmax():
 	import numpy as np
 	from pandas.testing import assert_frame_equal
 
-	from dtimsprep import merge
+	from merge_segments import merge
 
 	segments = pd.DataFrame(
 		columns=["road", "cwy", "slk_from", "slk_to"],

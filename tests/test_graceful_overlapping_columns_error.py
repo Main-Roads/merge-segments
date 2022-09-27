@@ -3,7 +3,7 @@ import pytest
 import re
 
 def test_graceful_overlapping_columns_error():
-	import dtimsprep.merge as merge
+	import merge_segments.merge as merge
 
 	segments = pd.DataFrame(
 		columns=["road", "cwy", "slk_from", "slk_to", "measure"],

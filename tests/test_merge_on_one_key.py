@@ -1,5 +1,5 @@
 import pandas as pd
-import dtimsprep.merge as merge
+import merge_segments.merge as merge
 
 
 def test_merge_on_one_key():

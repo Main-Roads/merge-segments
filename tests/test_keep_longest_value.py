@@ -1,6 +1,6 @@
 import pandas as pd
 import pytest
-import dtimsprep.merge as merge
+import merge_segments.merge as merge
 
 
 def test_keep_longest():

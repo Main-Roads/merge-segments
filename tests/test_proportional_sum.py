@@ -1,5 +1,5 @@
 import pandas as pd
-import dtimsprep.merge as merge
+import merge_segments.merge as merge
 import pytest
 
 def test_proportional_sum():

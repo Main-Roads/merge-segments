@@ -2,7 +2,7 @@ import pytest
 
 def test_wrong_argument_type():
 	import pandas as pd
-	from dtimsprep import merge
+	from merge_segments import merge
 
 	segments = pd.DataFrame(
 		columns=["road", "cwy", "slk_from", "slk_to"],

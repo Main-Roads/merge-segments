@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 def test_merge_fails_with_zero_length_target():
-	from dtimsprep import merge as merge
+	from merge_segments import merge as merge
 	segments = pd.DataFrame(
 		columns=["road", "slk_from", "slk_to"],
 		data=[
@@ -53,7 +53,7 @@ def test_merge_fails_with_zero_length_target():
 
 
 def test_merge_fails_with_zero_length_data():
-	from dtimsprep import merge as merge
+	from merge_segments import merge as merge
 	segments = pd.DataFrame(
 		columns=["road", "slk_from", "slk_to"],
 		data=[

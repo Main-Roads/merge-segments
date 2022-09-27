@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from dtimsprep import merge as merge
+from merge_segments import merge as merge
 from matplotlib import pyplot as plt
 from matplotlib.ticker import MultipleLocator, AutoMinorLocator
 
