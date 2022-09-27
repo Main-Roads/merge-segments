@@ -1,5 +1,7 @@
 # `merge_segments`<!-- omit in toc -->
 
+[![Run Tests](https://github.com/thehappycheese/merge-segments/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/thehappycheese/merge-segments/actions/workflows/main.yml)
+
 - [1. Introduction](#1-introduction)
   - [1.1. Dependencies](#11-dependencies)
 - [2. Install, Upgrade, Uninstall](#2-install-upgrade-uninstall)
