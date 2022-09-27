@@ -1,4 +1,4 @@
-# dtimsprep<!-- omit in toc -->
+# `merge_segments`<!-- omit in toc -->
 
 - [1. Introduction](#1-introduction)
   - [1.1. Dependencies](#11-dependencies)
@@ -14,11 +14,9 @@
 
 ## 1. Introduction
 
-`dtimsprep` is a python package useful in the preparation of data for the dTIMS
-modelling process.
+`merge_segments` is a python package which reproduces an old excell process.
 
-Currently only the `merge` module is included, but other modules may be added in
-the future.
+The purpose is to combine two data tables which have a linear segment index ("from" and "to" columns); ie where each row in the input tables represents some linear portion of an entity; for example a road segment from 5km to 10km.
 
 There is an ongoing effort to accelerate and parallelise the merge function
 under a new repo called
