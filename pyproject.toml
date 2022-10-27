@@ -1,11 +1,42 @@
+[project]
+name = "merge_segments"
+version = "0.6.0"
+authors = [
+  {name="Nicholas Archer"},
+]
+description = "A tool for merging data onto a road network segmentation"
+readme = "readme.md"
+requires-python = ">=3.8"
+dependencies = [
+  "pandas>=1.2.3", # TODO: untested below 1.3
+  "deprecated>=1.2",
+  "requests>=2.25",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/thehappycheese/merge-segments"
+
+
 [build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "/.github",
+  "/docs",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/merge_segments"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q --tb=short"
-
+addopts = "-ra -v --tb=short --capture=no"
+# -ra           : (r)show extra test summary (a)ll except passed (A)ll including passed
+# -q            : quiet
+# --tb=short    : shorter error messages
+# --capture=no  : disable pytest comment capture behaviour
 testpaths = [
   "tests"
 ]
