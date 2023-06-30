@@ -1,6 +1,6 @@
 # `merge_segments`<!-- omit in toc -->
 
-[![Run Tests](https://github.com/thehappycheese/merge-segments/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/thehappycheese/merge-segments/actions/workflows/main.yml)
+[![Publish to PyPi](https://github.com/thehappycheese/merge-segments/actions/workflows/publish_to_pypi.yml/badge.svg?branch=main)](https://github.com/thehappycheese/merge-segments/actions/workflows/publish_to_pypi.yml)
 [![PyPI - Version](https://img.shields.io/pypi/v/merge_segments.svg)](https://pypi.org/project/wideprint)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/merge_segments.svg)](https://pypi.org/project/wideprint)
 
