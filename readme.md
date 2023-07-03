@@ -5,13 +5,13 @@
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/merge_segments.svg)](https://pypi.org/project/wideprint)
 
 - [1. Introduction](#1-introduction)
-  - [1.1. Dependencies](#11-dependencies)
 - [2. Install, Upgrade, Uninstall](#2-install-upgrade-uninstall)
 - [3. Module `merge`](#3-module-merge)
   - [3.1. Function `merge.on_slk_intervals()`](#31-function-mergeon_slk_intervals)
   - [3.2. Class `merge.Action`](#32-class-mergeaction)
   - [3.3. Class `merge.Aggregation`](#33-class-mergeaggregation)
-    - [3.3.1. Notes about `Aggregation.KeepLongest()`](#331-notes-about-aggregationkeeplongest)
+    - [3.3.1. Notes about `KeepLongest()`](#331-notes-about-keeplongest)
+    - [3.3.2. Notes about `LengthWeightedPercentile(...)`](#332-notes-about-lengthweightedpercentile)
   - [3.4. Practical Example of Merge](#34-practical-example-of-merge)
 - [4. Notes](#4-notes)
   - [4.1. Correctness, Robustness, Test Coverage and Performance](#41-correctness-robustness-test-coverage-and-performance)
@@ -26,23 +26,18 @@ There is an ongoing effort to accelerate and parallelise the merge function
 under a new repo called
 [megamerge](https://github.com/thehappycheese/megamerge)
 
-### 1.1. Dependencies
-
-This package depends on Pandas (tested with version 1.3.1) and is most likely to
-work as expected in Python 3.9+.
-
 ## 2. Install, Upgrade, Uninstall
 
 To install:
 
 ```powershell
-pip install "https://github.com/thehappycheese/merge-segments/zipball/main/"
+pip install merge_segments
 ```
 
 To Upgrade:
 
 ```powershell
-pip install --upgrade "https://github.com/thehappycheese/merge-segments/zipball/main"
+pip install --upgrade merge_segments
 ```
 
 To show installed version:
@@ -155,10 +150,10 @@ The following merge aggregations are supported:
 | Constructor                                                   | Purpose                                                                                                                                                                                                                          |
 | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `merge.Aggregation.First()`                                   | Keep the first non-blank value.                                                                                                                                                                                                  |
-| `merge.Aggregation.KeepLongest()`                             | Keep the longest non-blank value. see notes below                                                                                                                                                                                |
+| `merge.Aggregation.KeepLongest()`                             | Keep the longest non-blank value. ( [see notes below](#331-notes-about-aggregationkeeplongest) )                                                                                                                                                                                |
 | `merge.Aggregation.LengthWeightedAverage()`                   | Compute the length weighted average of non-blank values                                                                                                                                                                          |
 | `merge.Aggregation.Average()`                                 | The average non-blank overlapping value.                                                                                                                                         |
-| `merge.Aggregation.LengthWeightedPercentile(percentile=0.75)` | Compute the length weighted percentile (see description of method below). Value should be between 0.0 and 1.0. 0.75 means 75th percentile.                                                                                       |
+| `merge.Aggregation.LengthWeightedPercentile(percentile=0.75)` | Compute the length weighted percentile ( [see notes below](#332-notes-about-aggregationlengthweightedpercentilepercentile) ). Value should be between 0.0 and 1.0. 0.75 means 75th percentile.                                                                                       |
 | `merge.Aggregation.SumProportionOfData()`                     | The sum of all overlapping `data` segments, where the value of each overlapping segment is multiplied by the length of the overlap divided by the length of the `data` segment. This is the same behaviour as the old VBA macro. |
 | `merge.Aggregation.SumProportionOfTarget()`                   | The sum of all overlapping `data` segments, where the value of each overlapping segment is multiplied by the length of the overlap divided by the length of the `target` segment. This aggregation method is suitable when aggregating columns measured in `Units per Kilometre` or `% of length`. The aggregated value will have the same unit.                                                |
 | `merge.Aggregation.Sum()`                                     | Compute the sum of all data overlapping the target segment.                                                                                                                                                                      |
@@ -167,7 +162,7 @@ The following merge aggregations are supported:
 | `merge.Aggregation.IndexOfMin()`                              | The row-index in the `data` with the minimum value. After merging the index can be used to fetch things like `"Surface Type"` of `"Oldest Surface"` (ie minimum `"Surface Year"`)                                                |
 | `merge.Aggregation.IndexOfMax()`                              | The row-index in the `data` with the maximum value.                                                                                                                                                                              |
 
-#### 3.3.1. Notes about `Aggregation.KeepLongest()`
+#### 3.3.1. Notes about `KeepLongest()`
 
 `KeepLongest()` works by observing both the segment lengths and segment values
 for data rows matching a particular target segment.
@@ -225,6 +220,38 @@ cause misbehaviour for the `KeepLongest` aggregation. Internally the `pandas`
 segment values. Actual behaviour will depend on how that function is implemented
 by `pandas` internal code.
 
+#### 3.3.2. Notes about `LengthWeightedPercentile(...)`
+
+A the 'length weighted' version of percentile is a fairly uncommon operation
+that only really makes sense when aggregating values for segments of varying
+lengths;
+
+The procedure is similar to a normal percentile calculation in that it involves
+sorting the values to be merged in ascending order onto a vertical bar chart,
+then sampling the `y` value of the chart at some fraction (percentage) of the
+way along the `x` axis.
+
+The 'length weighted' version provided by this package is very similar, except
+that the 'width' of the bars in the bar chart are increased to match the (slk)
+length of the segments they represent. Values are still sorted by ascending
+order along the `x` axis, not by length of segment. The percentage is then
+measured from the midpoint of the first bar to the midpoint of the last bar, and
+linear interpolation is performed between the midpoint of each bar in between.
+
+```text
+      |                          _○_
+      |                         |   |
+      |                      ▴  |   |   <---- 75th percentile Value
+Value |              _____○_____|   |
+      |        __○__|           |   |
+      |       |     |           |   |
+      |  __○__|     |           |   |
+      | |     |     |           |   |
+           |<-----SLK Length----->|
+           0%                ↑   100%
+                             │
+      75th percentile ───────┘
+```
 
 ### 3.4. Practical Example of Merge
 
