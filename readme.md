@@ -18,8 +18,6 @@
 
 ## 1. Introduction
 
-`merge_segments` is a python package which reproduces an old excell process.
-
 The purpose is to combine two data tables which have a linear segment index ("from" and "to" columns); ie where each row in the input tables represents some linear portion of an entity; for example a road segment from 5km to 10km.
 
 There is an ongoing effort to accelerate and parallelise the merge function
