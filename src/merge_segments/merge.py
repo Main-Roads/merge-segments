@@ -34,12 +34,15 @@ def configure_performance_logger(callback: Optional[PerformanceCallback]) -> Non
 
 def _emit_performance_event(event: str, **metrics: float) -> None:
     if _performance_logger is not None:
-        _performance_logger(event, {key: float(value) for key, value in metrics.items()})
+        _performance_logger(
+            event, {key: float(value) for key, value in metrics.items()}
+        )
 
 
 def _configure_default_performance_logger_from_env() -> None:
     mode = os.getenv("MERGE_SEGMENTS_PERF_LOG")
     if mode and mode.lower() == "stdout":
+
         def _stdout_logger(event: str, log_metrics: PerformanceMetrics) -> None:
             ordered = ", ".join(
                 f"{key}={value:.6f}" for key, value in sorted(log_metrics.items())
@@ -47,6 +50,7 @@ def _configure_default_performance_logger_from_env() -> None:
             print(f"[merge_segments][perf] {event}: {ordered}")
 
         configure_performance_logger(_stdout_logger)
+
 
 try:
     from tqdm import tqdm as _real_tqdm
@@ -388,13 +392,13 @@ def on_slk_intervals(
             # create a blank row to store the result of each column
             aggregated_result_row = []
             for column_action_index, column_action in enumerate(column_actions):
-                column_len_to_aggregate: pd.DataFrame = (
-                    data_to_aggregate_for_target_group.loc[
-                        :, [column_action.column_name]
-                    ].assign(
-                        overlap_len=overlap_len
-                    )  # assign is done here so that NaN data can be dropped at the same time as the overlap lengths. Later we also benefit from the combination by being able to concurrently sort both columns.
-                )
+                column_len_to_aggregate: (
+                    pd.DataFrame
+                ) = data_to_aggregate_for_target_group.loc[
+                    :, [column_action.column_name]
+                ].assign(
+                    overlap_len=overlap_len
+                )  # assign is done here so that NaN data can be dropped at the same time as the overlap lengths. Later we also benefit from the combination by being able to concurrently sort both columns.
                 column_len_to_aggregate = column_len_to_aggregate[
                     ~column_len_to_aggregate.iloc[:, 0].isna()
                     & (column_len_to_aggregate["overlap_len"] > 0)
@@ -453,9 +457,9 @@ def on_slk_intervals(
                     column_to_aggregate = column_len_to_aggregate.iloc[
                         :, 0
                     ]  # TODO: Why is this repeated?
-                    column_to_aggregate_overlap_len = (
-                        column_len_to_aggregate.iloc[:, 1]
-                    )  # TODO: Why is this repeated?
+                    column_to_aggregate_overlap_len = column_len_to_aggregate.iloc[
+                        :, 1
+                    ]  # TODO: Why is this repeated?
 
                     x_coords = (
                         (column_to_aggregate_overlap_len.rolling(2).mean())

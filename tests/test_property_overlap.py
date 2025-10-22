@@ -19,7 +19,9 @@ def _generate_segments(rng: random.Random, group_count: int, per_group: int):
     return pd.DataFrame(records, columns=["road", "slk_from", "slk_to"])
 
 
-def _generate_data_segments(rng: random.Random, group_count: int, count: int, max_len: int):
+def _generate_data_segments(
+    rng: random.Random, group_count: int, count: int, max_len: int
+):
     records = []
     for group_idx in range(group_count):
         road = f"R{group_idx:03d}"

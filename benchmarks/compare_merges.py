@@ -29,7 +29,9 @@ class BenchmarkConfig:
     seed: int
 
 
-def _build_frames(config: BenchmarkConfig) -> tuple[pd.DataFrame, pd.DataFrame, list[merge_module.Action]]:
+def _build_frames(
+    config: BenchmarkConfig,
+) -> tuple[pd.DataFrame, pd.DataFrame, list[merge_module.Action]]:
     rng = np.random.default_rng(config.seed)
     segment_length = 100
     target_rows_per_group = config.target_rows // config.groups
@@ -125,7 +127,9 @@ def run_benchmark(config: BenchmarkConfig) -> None:
         repeats=config.repeats,
     )
 
-    assert_frame_equal(legacy_result.sort_index(axis=1), optimized_result.sort_index(axis=1))
+    assert_frame_equal(
+        legacy_result.sort_index(axis=1), optimized_result.sort_index(axis=1)
+    )
 
     speedup = legacy_time / optimized_time if optimized_time else float("inf")
 
@@ -140,8 +144,12 @@ def parse_args() -> BenchmarkConfig:
     parser.add_argument("--targets", type=int, default=5000, help="Total target rows")
     parser.add_argument("--data", type=int, default=15000, help="Total data rows")
     parser.add_argument("--groups", type=int, default=5, help="Number of join groups")
-    parser.add_argument("--repeats", type=int, default=5, help="Repeat runs and keep best timing")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
+    parser.add_argument(
+        "--repeats", type=int, default=5, help="Repeat runs and keep best timing"
+    )
+    parser.add_argument(
+        "--seed", type=int, default=42, help="Random seed for reproducibility"
+    )
     args = parser.parse_args()
     return BenchmarkConfig(
         target_rows=args.targets,
