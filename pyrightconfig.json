@@ -1,0 +1,12 @@
+{
+  "include": ["src"],
+  "exclude": ["tests_manual"],
+  "reportMissingImports": "none",
+  "reportMissingTypeStubs": "warning",
+  "reportUnnecessaryTypeIgnoreComment": "warning",
+  "executionEnvironments": [
+    {
+      "root": "src"
+    }
+  ]
+}

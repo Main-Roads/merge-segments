@@ -7,3 +7,6 @@ dist/
 *.egg-info/
 Thumbs.db
 .pytest_cache/
+.venv/
+*.pdf
+ephemeral/

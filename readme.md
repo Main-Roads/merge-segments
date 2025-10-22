@@ -5,9 +5,14 @@
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/merge_segments.svg)](https://pypi.org/project/wideprint)
 
 - [1. Introduction](#1-introduction)
+    - [1.1. Public API Surface](#11-public-api-surface)
 - [2. Install, Upgrade, Uninstall](#2-install-upgrade-uninstall)
+    - [2.1. Recommended Environment Setup](#21-recommended-environment-setup)
+    - [2.2. Optional Extras](#22-optional-extras)
+    - [2.3. Development Install](#23-development-install)
 - [3. Module `merge`](#3-module-merge)
   - [3.1. Function `merge.on_slk_intervals()`](#31-function-mergeon_slk_intervals)
+    - [3.1.1. Function `merge.on_slk_intervals_optimized()`](#311-function-mergeon_slk_intervals_optimized)
   - [3.2. Class `merge.Action`](#32-class-mergeaction)
   - [3.3. Class `merge.Aggregation`](#33-class-mergeaggregation)
     - [3.3.1. Notes about `KeepLongest()`](#331-notes-about-keeplongest)
@@ -15,6 +20,15 @@
   - [3.4. Practical Example of Merge](#34-practical-example-of-merge)
 - [4. Notes](#4-notes)
   - [4.1. Correctness, Robustness, Test Coverage and Performance](#41-correctness-robustness-test-coverage-and-performance)
+- [5. Release & Versioning](#5-release--versioning)
+    - [5.1. Semantic Versioning Policy](#51-semantic-versioning-policy)
+    - [5.2. Changelog](#52-changelog)
+    - [5.3. Static Type Checking](#53-static-type-checking)
+- [6. Performance & Controls](#6-performance--controls)
+    - [6.1. Benchmarking](#61-benchmarking)
+    - [6.2. Performance Logging](#62-performance-logging)
+    - [6.3. Selecting the Optimized Path](#63-selecting-the-optimized-path)
+    - [6.4. Validating Optimized Outputs](#64-validating-optimized-outputs)
 
 ## 1. Introduction
 
@@ -24,35 +38,82 @@ There is an ongoing effort to accelerate and parallelise the merge function
 under a new repo called
 [megamerge](https://github.com/thehappycheese/megamerge)
 
+### 1.1. Public API Surface
+
+The `merge_segments` package guarantees the following top-level symbols. They
+are re-exported from the package root and covered by semantic versioning.
+
+| Symbol | Kind | Description |
+| ------ | ---- | ----------- |
+| `Action` | class | Describes a column aggregation request (source column, aggregation strategy, optional rename). |
+| `Aggregation` | class | Factory for supported aggregation strategies such as `KeepLongest`, `LengthWeightedAverage`, and `LengthWeightedPercentile`. |
+| `on_slk_intervals` | function | Legacy, fully tested merge routine that operates row-by-row. |
+| `on_slk_intervals_optimized` | function | Vectorised merge routine that accelerates most numeric workloads while maintaining feature parity with the legacy path. |
+| `on_slk_intervals_fallback` | function | Categorical-friendly implementation that the optimized function delegates to when required. |
+| `__version__` | string | Package version determined from installed metadata. |
+
+Import them directly from the package root:
+
+```python
+from merge_segments import Action, Aggregation, on_slk_intervals
+```
+
+Additional implementation details (validation helpers, exception types) remain
+internal. Backwards compatibility promises apply to the table above and any
+behaviour explicitly documented in this README.
+
 ## 2. Install, Upgrade, Uninstall
 
-To install:
+### 2.1. Recommended Environment Setup
+
+Create an isolated environment before installing to keep dependencies tidy:
 
 ```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 pip install merge_segments
 ```
 
-To Upgrade:
+Upgrade, inspect, or remove the package from the same environment as needed:
 
 ```powershell
 pip install --upgrade merge_segments
-```
-
-To show installed version:
-
-```powershell
 pip show merge_segments
-```
-
-To remove:
-
-```powershell
 pip uninstall merge_segments
 ```
+
+### 2.2. Optional Extras
+
+The core package now keeps optional tooling out of the default install. Add
+extras when you need progress bars or plotting helpers:
+
+```powershell
+pip install "merge_segments[progress]"      # tqdm-backed progress bars
+pip install "merge_segments[plotting]"      # matplotlib-based charts
+```
+
+Combine extras as required (`merge_segments[progress,plotting]`).
+
+### 2.3. Development Install
+
+Contributors can clone the repository and install the pinned toolchain with the
+provided requirements file:
+
+```powershell
+pip install -r requirements-dev.txt
+```
+
+This installs the package in editable mode with optional extras, plus linters,
+type checkers, and the test stack declared in `pyproject.toml`.
 
 ## 3. Module `merge`
 
 ### 3.1. Function `merge.on_slk_intervals()`
+
+`merge.on_slk_intervals()` is the legacy, fully tested merge routine. It
+remains the default choice for production workflows because it has the most
+extensive real-world validation.
 
 The following code demonstrates `merge.on_slk_intervals()` by merging the dummy
 dataset `pavement_data` against the target `segmentation` dataframe.
@@ -104,6 +165,35 @@ assert result.compare(
 ).empty
 
 ```
+
+### 3.1.1. Function `merge.on_slk_intervals_optimized()`
+
+`merge.on_slk_intervals_optimized()` exposes the same interface as the legacy
+function but uses a new vectorised implementation that prioritises speed. It
+has passed the initial automated test suite and produces matching outputs for
+the covered scenarios, yet it still requires additional testing on large,
+real-world datasets before being treated as a drop-in replacement. The helper
+falls back to the legacy logic for categorical aggregations, so behaviour
+remains consistent even when the fast path cannot be used.
+
+A minimal invocation mirrors the legacy usage:
+
+```python
+result = merge.on_slk_intervals_optimized(
+    target=segmentation,
+    data=pavement_data,
+    join_left=["road_no", "carriageway"],
+    column_actions=[
+        merge.Action("pavement_width",  merge.Aggregation.LengthWeightedAverage()),
+        merge.Action("pavement_type",   merge.Aggregation.KeepLongest()),
+    ],
+    from_to=("slk_from", "slk_to"),
+)
+```
+
+Use the optimized function when you need shorter runtimes and are able to
+perform additional validation in your environment; otherwise prefer the legacy
+function for its battle-tested reliability.
 
 | Parameter      | Type                 | Note                                                                                                                                                                                                                                                                                                              |
 | -------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -365,3 +455,119 @@ optimisations could be explored
 
 - column-wise parallelism
 - building a Rust python module (see https://github.com/thehappycheese/megamerge)
+
+## 5. Release & Versioning
+
+### 5.1. Semantic Versioning Policy
+
+`merge_segments` follows [Semantic Versioning 2.0.0](https://semver.org/). The
+documented public API in [Section&nbsp;1.1](#11-public-api-surface) remains stable
+within a major release. Backwards-incompatible changes will only ship alongside
+major version bumps after being highlighted in the changelog.
+
+### 5.2. Changelog
+
+User-facing changes are recorded in [`CHANGELOG.md`](./CHANGELOG.md). Each
+release entry summarises new features, bug fixes, and deprecations so consumers
+can assess impact before upgrading.
+
+Latest release: **1.0.0** (2025-10-22).
+
+### 5.3. Static Type Checking
+
+The distribution includes inline type hints and a `py.typed` marker so type
+checkers recognise the package as typed. A MyPy configuration (see
+`[tool.mypy]` in `pyproject.toml`) targets the `merge_segments` package and
+enables optional static analysis via:
+
+```powershell
+python -m pip install mypy
+python -m mypy src/merge_segments
+```
+
+Pyright users can run `pyright` with the bundled `pyrightconfig.json` for an
+equivalent experience.
+
+## 6. Performance & Controls
+
+### 6.1. Benchmarking
+
+Use `benchmarks/compare_merges.py` to compare the legacy and optimized paths on
+synthetic data:
+
+```powershell
+python benchmarks/compare_merges.py --targets 5000 --data 15000 --groups 5 --repeats 5
+```
+
+The script times both implementations, asserts that their outputs match, and
+prints a speedup factor. Adjust the row counts to resemble your production data
+volume before extrapolating the results.
+
+### 6.2. Performance Logging
+
+Register a custom logger via `merge.configure_performance_logger` to collect
+merge durations, row counts, and whether the optimized path delegated to the
+fallback:
+
+```python
+from merge_segments import configure_performance_logger
+
+def log_event(name: str, metrics: dict[str, float]) -> None:
+    print(f"event={name} metrics={metrics}")
+
+configure_performance_logger(log_event)
+```
+
+For ad-hoc tracing, set an environment variable before importing the package:
+
+```powershell
+# Current PowerShell session only
+$env:MERGE_SEGMENTS_PERF_LOG = "stdout"
+```
+
+The module will emit timing messages such as
+`[merge_segments][perf] on_slk_intervals_optimized: duration=12.345000, ...`.
+
+### 6.3. Selecting the Optimized Path
+
+Call `merge.on_slk_intervals_auto` to let the library choose between the
+optimized and legacy helpers:
+
+```python
+from merge_segments import merge
+
+result = merge.on_slk_intervals_auto(
+    target=target,
+    data=data,
+    join_left=["road"],
+    column_actions=actions,
+    from_to=("slk_from", "slk_to"),
+)
+```
+
+Set `prefer_optimized=False` to force the legacy path for a single call, or set
+`MERGE_SEGMENTS_DEFAULT_MODE=legacy` (or `optimized`) to configure the default
+mode for the current process.
+
+### 6.4. Validating Optimized Outputs
+
+When adopting the optimized path in production, validate it against the legacy
+result set before rollout:
+
+```python
+from pandas.testing import assert_frame_equal
+from merge_segments import merge
+
+legacy = merge.on_slk_intervals(...)
+optimized = merge.on_slk_intervals_optimized(...)
+
+assert_frame_equal(
+    legacy.sort_index(axis=1),
+    optimized.sort_index(axis=1),
+    check_dtype=False,
+)
+```
+
+For large datasets, run this comparison on representative samples or pair it
+with the `benchmarks/compare_merges.py` script to generate timing and parity
+reports.

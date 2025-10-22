@@ -3,8 +3,10 @@
 import pandas as pd
 import pytest
 
+from merge_segments import merge as merge
+from merge_segments.exceptions import ZeroLengthSegmentError
+
 def test_merge_fails_with_zero_length_target():
-	from merge_segments import merge as merge
 	segments = pd.DataFrame(
 		columns=["road", "slk_from", "slk_to"],
 		data=[
@@ -30,17 +32,8 @@ def test_merge_fails_with_zero_length_target():
 		]
 	)
 
-	expected_output = pd.DataFrame(
-		columns=["road", "slk_from", "slk_to",  "measure longest value",  "category longest value"],
-		data=[
-			["H001",   0, 100,  1.0,  "A"],
-			["H001", 100, 200,  1.0,  "B"],
-			["H001", 200, 300,  5.0,  "C"],
-			["H001", 300, 400,  8.0,  "F"],
-		]
-	)
-	with pytest.raises(Exception, match="zero length"):
-		res = merge.on_slk_intervals(
+	with pytest.raises(ZeroLengthSegmentError, match="zero length"):
+		merge.on_slk_intervals(
 			segments,
 			data,
 			["road"],
@@ -53,7 +46,6 @@ def test_merge_fails_with_zero_length_target():
 
 
 def test_merge_fails_with_zero_length_data():
-	from merge_segments import merge as merge
 	segments = pd.DataFrame(
 		columns=["road", "slk_from", "slk_to"],
 		data=[
@@ -79,17 +71,8 @@ def test_merge_fails_with_zero_length_data():
 		]
 	)
 
-	expected_output = pd.DataFrame(
-		columns=["road", "slk_from", "slk_to",  "measure longest value",  "category longest value"],
-		data=[
-			["H001",   0, 100,  1.0,  "A"],
-			["H001", 100, 200,  1.0,  "B"],
-			["H001", 200, 300,  5.0,  "C"],
-			["H001", 300, 400,  8.0,  "F"],
-		]
-	)
-	with pytest.raises(Exception, match="zero length"):
-		res = merge.on_slk_intervals(
+	with pytest.raises(ZeroLengthSegmentError, match="zero length"):
+		merge.on_slk_intervals(
 			segments,
 			data,
 			["road"],

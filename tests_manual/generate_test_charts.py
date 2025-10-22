@@ -99,10 +99,11 @@ def plot_seg_vs_merged(seg, dat, test_name):
 	
 	plt.tight_layout()
 	plt.savefig(
-		f"./tests/test_plots/{test_name}.pdf",
+		f"./tests_manual/test_plots/{test_name}.pdf",
 		orientation="landscape",
 		format="pdf",
 	)
+	print(f"Saved plot to ./tests_manual/test_plots/{test_name}.pdf")
 
 def test_pytest():
 	assert True
