@@ -315,8 +315,8 @@ def on_slk_intervals(
     start_time = time.perf_counter()
     slk_from, slk_to = from_to
 
-    result_index = []
-    result_rows = []
+    result_index: list[Any] = []
+    result_rows: list[list[Any]] = []
 
     target, data = _validate_inputs(target, data, join_left, column_actions, from_to)
 
@@ -390,7 +390,7 @@ def on_slk_intervals(
 
             # for each column of data that we keep, we must aggregate each field down to a single value
             # create a blank row to store the result of each column
-            aggregated_result_row = []
+            aggregated_result_row: list[Any] = []
             for column_action_index, column_action in enumerate(column_actions):
                 column_len_to_aggregate: (
                     pd.DataFrame
