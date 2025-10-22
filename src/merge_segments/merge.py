@@ -721,8 +721,8 @@ def on_slk_intervals_optimized(
         raise ValueError(f"Unsupported aggregation type: {agg_type}")
 
     # ---------- Main loop over target groups ----------
-    result_buffer: list[list[float]] = []
-    result_index: list = []
+    result_buffer: list[list[Any]] = []
+    result_index: list[Any] = []
 
     target_groups = target.groupby(join_left, sort=False)
     print(
@@ -768,7 +768,7 @@ def on_slk_intervals_optimized(
                 continue  # this target row gets NaNs (handled after loop)
             target_length = tgt_lengths[local_idx]
 
-            aggregated_values = []
+            aggregated_values: list[Any] = []
             for action in column_actions:
                 values = action_arrays[action.column_name][mask]
                 overlaps = overlap_row[mask]
@@ -1065,8 +1065,8 @@ def on_slk_intervals_fallback(
 
         raise ValueError(f"Unsupported aggregation type: {agg_type}")
 
-    result_buffer: list[list[float]] = []
-    result_index: list = []
+    result_buffer: list[list[Any]] = []
+    result_index: list[Any] = []
 
     for key, target_group in tqdm(
         target_groups, total=target_groups.ngroups, desc="merge_segments fallback"
@@ -1105,7 +1105,7 @@ def on_slk_intervals_fallback(
                 continue
             target_length = tgt_lengths[local_idx]
 
-            aggregated_values = []
+            aggregated_values: list[Any] = []
             for action in column_actions:
                 values = action_arrays[action.column_name][mask]
                 overlaps = overlap_row[mask]

@@ -31,7 +31,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Historical TODO comment about untested pandas versions from the dependency
   list.
 
-## [0.6.1] - 2024-??-??
+## [0.6.1] - 2023-07-04
 
 > Historical release prior to adopting this changelog. Refer to the git history
 > for specific changes.
