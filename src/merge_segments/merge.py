@@ -524,7 +524,9 @@ def on_slk_intervals_legacy(
 
     result = target.join(
         pd.DataFrame(
-            result_rows, columns=[x.rename for x in column_actions], index=result_index
+            result_rows,
+            columns=[x.rename for x in column_actions],
+            index=pd.Index(result_index),
         )
     )
     if len(result.index) != len(target.index):
