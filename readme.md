@@ -35,6 +35,9 @@ created and maintained by [@thehappycheese](https://github.com/thehappycheese).
 We are grateful for the original work, which provided a robust, well-tested
 foundation for merging linear segment data.
 
+**Maintainer:** Dagmawi Tadesse  
+**Original Author:** Nicholas Archer
+
 ### Why This Fork Exists
 
 The original `merge_segments` package on PyPI is no longer actively maintained.
@@ -558,9 +561,6 @@ enables optional static analysis via:
 python -m pip install mypy
 python -m mypy src/merge_segments
 ```
-
-Pyright users can run `pyright` with the bundled `pyrightconfig.json` for an
-equivalent experience.
 
 ## 6. Performance & Controls
 

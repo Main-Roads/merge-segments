@@ -60,9 +60,6 @@ jobs:
       - name: Run mypy
         run: mypy src/merge_segments
 
-      - name: Run pyright
-        run: pyright
-
   tests:
     name: Tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest

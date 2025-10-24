@@ -20,11 +20,10 @@ def lint(session: nox.Session) -> None:
 
 @nox.session(reuse_venv=True)
 def type_check(session: nox.Session) -> None:
-    """Execute static type checkers."""
-    session.install("mypy>=1.10", "pyright>=1.1.379")
+    """Execute static type checking with mypy."""
+    session.install("mypy>=1.10")
     session.install(".[progress,plotting]")
     session.run("mypy", "src/merge_segments")
-    session.run("pyright")
 
 
 @nox.session(python=["3.8", "3.9", "3.10", "3.11"], reuse_venv=True)

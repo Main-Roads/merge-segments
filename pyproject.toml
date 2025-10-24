@@ -4,41 +4,46 @@ version = "1.0.0"
 authors = [
   {name="Nicholas Archer"},
 ]
+maintainers = [
+  {name="Dagmawi Tadesse"},
+]
 description = "A tool for merging data onto a road network segmentation"
 readme = "readme.md"
 requires-python = ">=3.8"
 dependencies = [
-  "pandas>=1.5",
-  "deprecated>=1.2",
-  "numpy>=1.22",
+  "pandas>=2.3",
+  "deprecated>=1.2.18",
+  "numpy>=2.3",
 ]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
 ]
 
 [project.optional-dependencies]
 progress = [
-  "tqdm>=4.66",
+  "tqdm>=4.67",
 ]
 plotting = [
-  "matplotlib>=3.7",
+  "matplotlib>=3.10",
 ]
 dev = [
-  "pytest>=8.2",
+  "pytest>=8.4",
   "pytest-cov>=5.0",
-  "mypy>=1.10",
-  "pyright>=1.1.379",
-  "black>=24.8",
-  "ruff>=0.6.9",
-  "types-Deprecated>=1.2.9",
+  "mypy>=1.18",
+  "black>=25.9",
+  "ruff>=0.14",
   "nox>=2024.4",
+  "pre-commit>=4.3",
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/thehappycheese/merge-segments"
+"Homepage" = "https://github.com/Main-Roads/merge-segments"
 
 
 [build-system]
@@ -66,7 +71,7 @@ testpaths = [
 ]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.13"
 mypy_path = "src"
 packages = ["merge_segments"]
 ignore_missing_imports = true
