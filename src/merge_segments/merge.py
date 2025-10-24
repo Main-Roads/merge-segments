@@ -305,7 +305,7 @@ def _validate_inputs(
     return target_df, data_df
 
 
-def on_slk_intervals(
+def on_slk_intervals_legacy(
     target: pd.DataFrame,
     data: pd.DataFrame,
     join_left: List[str],
@@ -533,13 +533,64 @@ def on_slk_intervals(
         )
     duration = time.perf_counter() - start_time
     _emit_performance_event(
-        "on_slk_intervals",
+        "on_slk_intervals_legacy",
         duration=duration,
         groups=float(target_groups.ngroups),
         actions=float(len(column_actions)),
         rows=float(len(result_rows)),
     )
     return result
+
+
+def on_slk_intervals(
+    target: pd.DataFrame,
+    data: pd.DataFrame,
+    join_left: List[str],
+    column_actions: List[Action],
+    from_to: Tuple[str, str],
+    legacy: bool = True,
+) -> pd.DataFrame:
+    """Merge and aggregate interval data onto target segments.
+
+    This is the main entry point for merging interval-based data. By default,
+    it uses the legacy implementation for backwards compatibility. Set
+    ``legacy=False`` to use the optimized vectorized implementation.
+
+    Args:
+        target: DataFrame containing the segments onto which data will be merged.
+        data: DataFrame providing the measurements to aggregate.
+        join_left: Ordered list of column names that define grouping keys.
+        column_actions: Sequence of Action instances describing aggregations.
+        from_to: Tuple containing the start and end column names for intervals.
+        legacy: If True (default), uses the legacy implementation. If False,
+            uses the optimized vectorized implementation.
+
+    Returns:
+        A new DataFrame with the same rows as target plus aggregated columns.
+
+    Examples:
+        >>> # Use legacy implementation (default)
+        >>> result = on_slk_intervals(target, data, ["road"], actions, ("from", "to"))
+        >>>
+        >>> # Use optimized implementation
+        >>> result = on_slk_intervals(target, data, ["road"], actions, ("from", "to"), legacy=False)
+    """
+    if legacy:
+        return on_slk_intervals_legacy(
+            target=target,
+            data=data,
+            join_left=join_left,
+            column_actions=column_actions,
+            from_to=from_to,
+        )
+    else:
+        return on_slk_intervals_optimized(
+            target=target,
+            data=data,
+            join_left=join_left,
+            column_actions=column_actions,
+            from_to=from_to,
+        )
 
 
 def on_slk_intervals_optimized(
@@ -872,7 +923,7 @@ def on_slk_intervals_auto(
             from_to=from_to,
         )
 
-    return on_slk_intervals(
+    return on_slk_intervals_legacy(
         target=target,
         data=data,
         join_left=join_left,

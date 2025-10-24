@@ -1,36 +1,73 @@
 # `merge_segments`<!-- omit in toc -->
 
-[![Publish to PyPi](https://github.com/thehappycheese/merge-segments/actions/workflows/publish_to_pypi.yml/badge.svg?branch=main)](https://github.com/thehappycheese/merge-segments/actions/workflows/publish_to_pypi.yml)
-[![PyPI - Version](https://img.shields.io/pypi/v/merge_segments.svg)](https://pypi.org/project/wideprint)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/merge_segments.svg)](https://pypi.org/project/wideprint)
+- [1. About This Fork](#1-about-this-fork)
+- [2. Introduction](#2-introduction)
+    - [2.1. Public API Surface](#21-public-api-surface)
+- [3. Install, Upgrade, Uninstall](#3-install-upgrade-uninstall)
+    - [3.1. Recommended Environment Setup](#31-recommended-environment-setup)
+    - [3.2. Optional Extras](#32-optional-extras)
+    - [3.3. Development Install](#33-development-install)
+- [4. Module `merge`](#4-module-merge)
+  - [4.1. Function `merge.on_slk_intervals()`](#41-function-mergeon_slk_intervals)
+    - [4.1.1. Function `merge.on_slk_intervals_optimized()`](#411-function-mergeon_slk_intervals_optimized)
+  - [4.2. Class `merge.Action`](#42-class-mergeaction)
+  - [4.3. Class `merge.Aggregation`](#43-class-mergeaggregation)
+    - [4.3.1. Notes about `KeepLongest()`](#431-notes-about-keeplongest)
+    - [4.3.2. Notes about `LengthWeightedPercentile(...)`](#432-notes-about-lengthweightedpercentile)
+  - [4.4. Practical Example of Merge](#44-practical-example-of-merge)
+- [5. Notes](#5-notes)
+  - [5.1. Correctness, Robustness, Test Coverage and Performance](#51-correctness-robustness-test-coverage-and-performance)
+- [6. Release & Versioning](#6-release--versioning)
+    - [6.1. Semantic Versioning Policy](#61-semantic-versioning-policy)
+    - [6.2. Changelog](#62-changelog)
+    - [6.3. Static Type Checking](#63-static-type-checking)
+- [7. Performance & Controls](#7-performance--controls)
+    - [7.1. Benchmarking](#71-benchmarking)
+    - [7.2. Performance Logging](#72-performance-logging)
+    - [7.3. Selecting the Optimized Path](#73-selecting-the-optimized-path)
+    - [7.4. Validating Optimized Outputs](#74-validating-optimized-outputs)
 
-- [1. Introduction](#1-introduction)
-    - [1.1. Public API Surface](#11-public-api-surface)
-- [2. Install, Upgrade, Uninstall](#2-install-upgrade-uninstall)
-    - [2.1. Recommended Environment Setup](#21-recommended-environment-setup)
-    - [2.2. Optional Extras](#22-optional-extras)
-    - [2.3. Development Install](#23-development-install)
-- [3. Module `merge`](#3-module-merge)
-  - [3.1. Function `merge.on_slk_intervals()`](#31-function-mergeon_slk_intervals)
-    - [3.1.1. Function `merge.on_slk_intervals_optimized()`](#311-function-mergeon_slk_intervals_optimized)
-  - [3.2. Class `merge.Action`](#32-class-mergeaction)
-  - [3.3. Class `merge.Aggregation`](#33-class-mergeaggregation)
-    - [3.3.1. Notes about `KeepLongest()`](#331-notes-about-keeplongest)
-    - [3.3.2. Notes about `LengthWeightedPercentile(...)`](#332-notes-about-lengthweightedpercentile)
-  - [3.4. Practical Example of Merge](#34-practical-example-of-merge)
-- [4. Notes](#4-notes)
-  - [4.1. Correctness, Robustness, Test Coverage and Performance](#41-correctness-robustness-test-coverage-and-performance)
-- [5. Release & Versioning](#5-release--versioning)
-    - [5.1. Semantic Versioning Policy](#51-semantic-versioning-policy)
-    - [5.2. Changelog](#52-changelog)
-    - [5.3. Static Type Checking](#53-static-type-checking)
-- [6. Performance & Controls](#6-performance--controls)
-    - [6.1. Benchmarking](#61-benchmarking)
-    - [6.2. Performance Logging](#62-performance-logging)
-    - [6.3. Selecting the Optimized Path](#63-selecting-the-optimized-path)
-    - [6.4. Validating Optimized Outputs](#64-validating-optimized-outputs)
+## 1. About This Fork
 
-## 1. Introduction
+This repository is a **maintained fork** of the original
+[`merge_segments`](https://github.com/thehappycheese/merge-segments) package
+created and maintained by [@thehappycheese](https://github.com/thehappycheese).
+We are grateful for the original work, which provided a robust, well-tested
+foundation for merging linear segment data.
+
+### Why This Fork Exists
+
+The original `merge_segments` package on PyPI is no longer actively maintained.
+This fork was created by Main Roads Western Australia to:
+
+- **Continue maintenance and bug fixes** for production usage
+- **Add performance optimizations** including a new vectorized merge implementation
+- **Improve developer experience** with modern CI/CD, type checking, and tooling
+- **Extend functionality** while maintaining backward compatibility
+
+### Key Differences from the Original
+
+| Feature | Original (PyPI) | This Fork (Main-Roads) |
+|---------|----------------|------------------------|
+| **Maintenance** | No longer maintained | Actively maintained |
+| **Installation** | `pip install merge_segments` | `python -m pip install git+https://github.com/Main-Roads/merge-segments.git` |
+| **Optimized Path** | Legacy implementation only | Legacy + vectorized optimized implementation |
+| **CI/CD** | Basic | Comprehensive (linting, type-checking, testing, wheels) |
+| **Type Hints** | Partial | Full mypy compliance with `py.typed` |
+| **Documentation** | Original README | Extended with performance guides and migration notes |
+
+### Choosing Between Versions
+
+- **Use the PyPI version** (`pip install merge_segments`) if you need the last
+  stable release and don't require the latest features or optimizations.
+- **Use this fork** if you need continued maintenance, performance improvements,
+  or want to contribute to ongoing development.
+
+Both versions maintain the same core API for backward compatibility, though this
+fork includes additional features (like the `legacy` parameter and optimized
+implementations) not available in the PyPI version.
+
+## 2. Introduction
 
 The purpose is to combine two data tables which have a linear segment index ("from" and "to" columns); ie where each row in the input tables represents some linear portion of an entity; for example a road segment from 5km to 10km.
 
@@ -47,7 +84,8 @@ are re-exported from the package root and covered by semantic versioning.
 | ------ | ---- | ----------- |
 | `Action` | class | Describes a column aggregation request (source column, aggregation strategy, optional rename). |
 | `Aggregation` | class | Factory for supported aggregation strategies such as `KeepLongest`, `LengthWeightedAverage`, and `LengthWeightedPercentile`. |
-| `on_slk_intervals` | function | Legacy, fully tested merge routine that operates row-by-row. |
+| `on_slk_intervals` | function | Main merge function with `legacy` parameter to choose between implementations (defaults to legacy for backward compatibility). |
+| `on_slk_intervals_legacy` | function | Legacy, fully tested merge routine that operates row-by-row. |
 | `on_slk_intervals_optimized` | function | Vectorised merge routine that accelerates most numeric workloads while maintaining feature parity with the legacy path. |
 | `on_slk_intervals_fallback` | function | Categorical-friendly implementation that the optimized function delegates to when required. |
 | `__version__` | string | Package version determined from installed metadata. |
@@ -62,9 +100,9 @@ Additional implementation details (validation helpers, exception types) remain
 internal. Backwards compatibility promises apply to the table above and any
 behaviour explicitly documented in this README.
 
-## 2. Install, Upgrade, Uninstall
+## 3. Install, Upgrade, Uninstall
 
-### 2.1. Recommended Environment Setup
+### 3.1. Recommended Environment Setup
 
 Create an isolated environment before installing to keep dependencies tidy:
 
@@ -72,48 +110,66 @@ Create an isolated environment before installing to keep dependencies tidy:
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-pip install merge_segments
+python -m pip install git+https://github.com/Main-Roads/merge-segments.git
+```
+
+To install a specific version or branch:
+
+```powershell
+# Install a specific version tag
+python -m pip install git+https://github.com/Main-Roads/merge-segments.git@v1.0.0
+
+# Install a specific branch
+python -m pip install git+https://github.com/Main-Roads/merge-segments.git@branch-name
+
+# Install a specific commit
+python -m pip install git+https://github.com/Main-Roads/merge-segments.git@commit-hash
 ```
 
 Upgrade, inspect, or remove the package from the same environment as needed:
 
 ```powershell
-pip install --upgrade merge_segments
-pip show merge_segments
-pip uninstall merge_segments
+python -m pip install --upgrade --force-reinstall git+https://github.com/Main-Roads/merge-segments.git
+python -m pip show merge_segments
+python -m pip uninstall merge_segments
 ```
 
-### 2.2. Optional Extras
+### 3.2. Optional Extras
 
 The core package now keeps optional tooling out of the default install. Add
 extras when you need progress bars or plotting helpers:
 
 ```powershell
-pip install "merge_segments[progress]"      # tqdm-backed progress bars
-pip install "merge_segments[plotting]"      # matplotlib-based charts
+python -m pip install "git+https://github.com/Main-Roads/merge-segments.git#egg=merge_segments[progress]"      # tqdm-backed progress bars
+python -m pip install "git+https://github.com/Main-Roads/merge-segments.git#egg=merge_segments[plotting]"      # matplotlib-based charts
+python -m pip install "git+https://github.com/Main-Roads/merge-segments.git#egg=merge_segments[progress,plotting]"  # All optional features
 ```
 
-Combine extras as required (`merge_segments[progress,plotting]`).
-
-### 2.3. Development Install
+### 3.3. Development Install
 
 Contributors can clone the repository and install the pinned toolchain with the
 provided requirements file:
 
 ```powershell
-pip install -r requirements-dev.txt
+git clone https://github.com/Main-Roads/merge-segments.git
+cd merge-segments
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements-dev.txt
 ```
 
 This installs the package in editable mode with optional extras, plus linters,
 type checkers, and the test stack declared in `pyproject.toml`.
 
-## 3. Module `merge`
+## 4. Module `merge`
 
 ### 3.1. Function `merge.on_slk_intervals()`
 
-`merge.on_slk_intervals()` is the legacy, fully tested merge routine. It
-remains the default choice for production workflows because it has the most
-extensive real-world validation.
+`merge.on_slk_intervals()` is the main entry point for merging interval data. It
+provides a `legacy` parameter to choose between the legacy implementation (default)
+and the optimized implementation. By default, it uses the legacy implementation
+for backward compatibility and extensive real-world validation.
 
 The following code demonstrates `merge.on_slk_intervals()` by merging the dummy
 dataset `pavement_data` against the target `segmentation` dataframe.
@@ -166,17 +222,33 @@ assert result.compare(
 
 ```
 
+To use the optimized implementation, set `legacy=False`:
+
+```python
+result = merge.on_slk_intervals(
+    target=segmentation,
+    data=pavement_data,
+    join_left=["road_no", "carriageway"],
+    column_actions=[
+        merge.Action("pavement_width",  merge.Aggregation.LengthWeightedAverage()),
+        merge.Action("pavement_type",   merge.Aggregation.KeepLongest())
+    ],
+    from_to=("slk_from", "slk_to"),
+    legacy=False  # Use optimized implementation
+)
+```
+
 ### 3.1.1. Function `merge.on_slk_intervals_optimized()`
 
-`merge.on_slk_intervals_optimized()` exposes the same interface as the legacy
-function but uses a new vectorised implementation that prioritises speed. It
-has passed the initial automated test suite and produces matching outputs for
-the covered scenarios, yet it still requires additional testing on large,
-real-world datasets before being treated as a drop-in replacement. The helper
+`merge.on_slk_intervals_optimized()` can also be called directly. It uses a
+vectorised implementation that prioritises speed and has passed the automated
+test suite, producing matching outputs for the covered scenarios. However, it
+still requires additional testing on large, real-world datasets before being
+treated as a production-ready drop-in replacement. The helper automatically
 falls back to the legacy logic for categorical aggregations, so behaviour
 remains consistent even when the fast path cannot be used.
 
-A minimal invocation mirrors the legacy usage:
+A minimal invocation:
 
 ```python
 result = merge.on_slk_intervals_optimized(
@@ -191,9 +263,10 @@ result = merge.on_slk_intervals_optimized(
 )
 ```
 
-Use the optimized function when you need shorter runtimes and are able to
-perform additional validation in your environment; otherwise prefer the legacy
-function for its battle-tested reliability.
+Use the optimized implementation (via `legacy=False` or by calling
+`on_slk_intervals_optimized()` directly) when you need shorter runtimes and are
+able to perform additional validation in your environment; otherwise prefer the
+legacy implementation for its battle-tested reliability.
 
 | Parameter      | Type                 | Note                                                                                                                                                                                                                                                                                                              |
 | -------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -202,6 +275,7 @@ function for its battle-tested reliability.
 | join_left      | `list[str]`          | Ordered list of column names to join with.<br>Typically `["road_no","cway"]`.<br>Note:<ul><li>These column names must match in both the `target` and `data` DataFrames</li></ul>                                                                                                                                  |
 | column_actions | `list[merge.Action]` | A list of `merge.Action()` objects describing the aggregation to be used for each column of data that is to be added to the target. See examples below.                                                                                                                                                           |
 | from_to        | `tuple[str, str]`    | The name of the start and end interval measures.<br>Typically `("slk_from", "slk_to")`.<br>Note:<ul><li>These column names must match in both the `target` and `data` DataFrames</li><li>These columns should be converted to integers for reliable results prior to calling merge (see example below.)</li></ul> |
+| legacy         | `bool`               | **Optional.** If `True` (default), uses the legacy implementation. If `False`, uses the optimized vectorized implementation. Can be omitted for backward compatibility.                                                                                                                                          |
 
 ### 3.2. Class `merge.Action`
 
@@ -558,7 +632,12 @@ result set before rollout:
 from pandas.testing import assert_frame_equal
 from merge_segments import merge
 
-legacy = merge.on_slk_intervals(...)
+# Compare using the legacy parameter
+legacy = merge.on_slk_intervals(..., legacy=True)
+optimized = merge.on_slk_intervals(..., legacy=False)
+
+# Or compare by calling the functions directly
+legacy = merge.on_slk_intervals_legacy(...)
 optimized = merge.on_slk_intervals_optimized(...)
 
 assert_frame_equal(
