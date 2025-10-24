@@ -11,9 +11,9 @@ description = "A tool for merging data onto a road network segmentation"
 readme = "readme.md"
 requires-python = ">=3.8"
 dependencies = [
-  "pandas>=2.3",
-  "deprecated>=1.2.18",
-  "numpy>=2.3",
+  "pandas>=1.5",
+  "deprecated>=1.2",
+  "numpy>=1.22",
 ]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
@@ -27,10 +27,10 @@ classifiers = [
 
 [project.optional-dependencies]
 progress = [
-  "tqdm>=4.67",
+  "tqdm>=4.66",
 ]
 plotting = [
-  "matplotlib>=3.10",
+  "matplotlib>=3.7",
 ]
 dev = [
   "pytest>=8.4",
