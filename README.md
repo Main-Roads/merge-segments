@@ -241,6 +241,25 @@ result = merge.on_slk_intervals(
 )
 ```
 
+For debugging or diagnostic purposes, enable verbose output with `verbose=True`:
+
+```python
+result = merge.on_slk_intervals(
+    target=segmentation,
+    data=pavement_data,
+    join_left=["road_no", "carriageway"],
+    column_actions=[
+        merge.Action("pavement_width",  merge.Aggregation.LengthWeightedAverage()),
+        merge.Action("pavement_type",   merge.Aggregation.KeepLongest())
+    ],
+    from_to=("slk_from", "slk_to"),
+    legacy=False,
+    verbose=True  # Show diagnostic messages and fallback notices
+)
+```
+
+When `verbose=True`, the function will print diagnostic information such as which implementation path is being used and when fallback to categorical handling occurs. By default (`verbose=False`), only progress bars are shown and pandas warnings are suppressed for cleaner output.
+
 ### 3.1.1. Function `merge.on_slk_intervals_optimized()`
 
 `merge.on_slk_intervals_optimized()` can also be called directly. It uses a
@@ -279,6 +298,7 @@ legacy implementation for its battle-tested reliability.
 | column_actions | `list[merge.Action]` | A list of `merge.Action()` objects describing the aggregation to be used for each column of data that is to be added to the target. See examples below.                                                                                                                                                           |
 | from_to        | `tuple[str, str]`    | The name of the start and end interval measures.<br>Typically `("slk_from", "slk_to")`.<br>Note:<ul><li>These column names must match in both the `target` and `data` DataFrames</li><li>These columns should be converted to integers for reliable results prior to calling merge (see example below.)</li></ul> |
 | legacy         | `bool`               | **Optional.** If `True` (default), uses the legacy implementation. If `False`, uses the optimized vectorized implementation. Can be omitted for backward compatibility.                                                                                                                                          |
+| verbose        | `bool`               | **Optional.** If `True`, prints diagnostic messages including implementation path and fallback notices. If `False` (default), only shows progress bars and suppresses pandas warnings for cleaner output.                                                                                                          |
 
 ### 3.2. Class `merge.Action`
 

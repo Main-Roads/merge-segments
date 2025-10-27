@@ -311,6 +311,7 @@ def on_slk_intervals_legacy(
     join_left: List[str],
     column_actions: List[Action],
     from_to: Tuple[str, str],
+    verbose: bool = False,
 ):
     start_time = time.perf_counter()
     slk_from, slk_to = from_to
@@ -551,6 +552,7 @@ def on_slk_intervals(
     column_actions: List[Action],
     from_to: Tuple[str, str],
     legacy: bool = True,
+    verbose: bool = False,
 ) -> pd.DataFrame:
     """Merge and aggregate interval data onto target segments.
 
@@ -566,6 +568,8 @@ def on_slk_intervals(
         from_to: Tuple containing the start and end column names for intervals.
         legacy: If True (default), uses the legacy implementation. If False,
             uses the optimized vectorized implementation.
+        verbose: If True, prints diagnostic messages including fallback notices.
+            If False (default), only shows progress bars and suppresses pandas warnings.
 
     Returns:
         A new DataFrame with the same rows as target plus aggregated columns.
@@ -576,6 +580,9 @@ def on_slk_intervals(
         >>>
         >>> # Use optimized implementation
         >>> result = on_slk_intervals(target, data, ["road"], actions, ("from", "to"), legacy=False)
+        >>>
+        >>> # Use optimized implementation with verbose output
+        >>> result = on_slk_intervals(target, data, ["road"], actions, ("from", "to"), legacy=False, verbose=True)
     """
     if legacy:
         return on_slk_intervals_legacy(
@@ -584,6 +591,7 @@ def on_slk_intervals(
             join_left=join_left,
             column_actions=column_actions,
             from_to=from_to,
+            verbose=verbose,
         )
     else:
         return on_slk_intervals_optimized(
@@ -592,6 +600,7 @@ def on_slk_intervals(
             join_left=join_left,
             column_actions=column_actions,
             from_to=from_to,
+            verbose=verbose,
         )
 
 
@@ -601,6 +610,7 @@ def on_slk_intervals_optimized(
     join_left: List[str],
     column_actions: List[Action],
     from_to: Tuple[str, str],
+    verbose: bool = False,
 ) -> pd.DataFrame:
     """Merge and aggregate interval data using the vectorised fast path.
 
@@ -663,9 +673,10 @@ def on_slk_intervals_optimized(
 
     fallback_columns = _should_use_categorical_fallback(data_subset, column_actions)
     if fallback_columns:
-        print(
-            f"[merge_segments] Falling back to categorical path for columns: {', '.join(fallback_columns)}"
-        )
+        if verbose:
+            print(
+                f"[merge_segments] Falling back to categorical path for columns: {', '.join(fallback_columns)}"
+            )
         result = on_slk_intervals_fallback(
             target=target,
             data=data,
@@ -676,6 +687,7 @@ def on_slk_intervals_optimized(
             data_groups=data_groups,
             skip_validation=True,
             perf_origin="optimized",
+            verbose=verbose,
         )
         duration = time.perf_counter() - start_time
         group_count = float(target.groupby(join_left, sort=False).ngroups)
@@ -778,81 +790,91 @@ def on_slk_intervals_optimized(
     result_index: list[Any] = []
 
     target_groups = target.groupby(join_left, sort=False)
-    print(
-        f"[merge_segments] Using optimized path across {len(column_actions)} action(s) and {target_groups.ngroups} group(s)."
-    )
-    for key, target_group in tqdm(
-        target_groups, total=target_groups.ngroups, desc="merge_segments optimized"
-    ):
-        key_tuple = _normalize_group_key(key)
-        data_group = data_groups.get(key_tuple)
-        if data_group is None:
-            continue  # no overlapping data → all NaN for these rows
-
-        tgt_starts = target_group[slk_from].to_numpy(dtype=float)
-        tgt_ends = target_group[slk_to].to_numpy(dtype=float)
-        tgt_lengths = tgt_ends - tgt_starts
-
-        data_starts = data_group[slk_from].to_numpy(dtype=float)
-        data_ends = data_group[slk_to].to_numpy(dtype=float)
-        data_lengths = data_group["_segment_len"].to_numpy(dtype=float)
-
-        # overlap matrix: (n_target, n_data)
-        overlap = np.minimum(tgt_ends[:, None], data_ends[None, :]) - np.maximum(
-            tgt_starts[:, None], data_starts[None, :]
+    if verbose:
+        print(
+            f"[merge_segments] Using optimized path across {len(column_actions)} action(s) and {target_groups.ngroups} group(s)."
         )
-        overlap = np.where(overlap > 0, overlap, 0.0)
 
-        if (overlap > 0).sum() == 0:
-            # No overlaps at all for this group; skip (all NaNs for each row)
-            continue
+    # Suppress pandas warnings unless verbose mode is enabled
+    import warnings
 
-        # Pre-extract action columns as NumPy arrays for fast slicing
-        action_arrays = {
-            action.column_name: data_group[action.column_name].to_numpy()
-            for action in column_actions
-        }
-        original_indices_arr = data_group["_original_index"].to_numpy()
+    with warnings.catch_warnings():
+        if not verbose:
+            warnings.filterwarnings("ignore", category=FutureWarning)
+            warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
 
-        for local_idx, (tgt_idx, tgt_row) in enumerate(target_group.iterrows()):
-            overlap_row = overlap[local_idx]
-            mask = overlap_row > 0
-            if not mask.any():
-                continue  # this target row gets NaNs (handled after loop)
-            target_length = tgt_lengths[local_idx]
+        for key, target_group in tqdm(
+            target_groups, total=target_groups.ngroups, desc="merge_segments optimized"
+        ):
+            key_tuple = _normalize_group_key(key)
+            data_group = data_groups.get(key_tuple)
+            if data_group is None:
+                continue  # no overlapping data → all NaN for these rows
 
-            aggregated_values: list[Any] = []
-            for action in column_actions:
-                values = action_arrays[action.column_name][mask]
-                overlaps = overlap_row[mask]
-                lengths = data_lengths[mask]
-                indices = original_indices_arr[mask]
-                if len(values) == 0:
-                    aggregated_values.append(np.nan)
-                    continue
+            tgt_starts = target_group[slk_from].to_numpy(dtype=float)
+            tgt_ends = target_group[slk_to].to_numpy(dtype=float)
+            tgt_lengths = tgt_ends - tgt_starts
 
-                valid = ~pd.isna(values)
-                if not valid.any():
-                    aggregated_values.append(np.nan)
-                    continue
+            data_starts = data_group[slk_from].to_numpy(dtype=float)
+            data_ends = data_group[slk_to].to_numpy(dtype=float)
+            data_lengths = data_group["_segment_len"].to_numpy(dtype=float)
 
-                values = values[valid]
-                overlaps = overlaps[valid]
-                lengths = lengths[valid]
-                indices = indices[valid]
+            # overlap matrix: (n_target, n_data)
+            overlap = np.minimum(tgt_ends[:, None], data_ends[None, :]) - np.maximum(
+                tgt_starts[:, None], data_starts[None, :]
+            )
+            overlap = np.where(overlap > 0, overlap, 0.0)
 
-                agg_value = _aggregate(
-                    action,
-                    values=values,
-                    overlaps=overlaps,
-                    data_lengths=lengths,
-                    target_length=target_length,
-                    source_indices=indices,
-                )
-                aggregated_values.append(agg_value)
+            if (overlap > 0).sum() == 0:
+                # No overlaps at all for this group; skip (all NaNs for each row)
+                continue
 
-            result_buffer.append(aggregated_values)
-            result_index.append(tgt_idx)
+            # Pre-extract action columns as NumPy arrays for fast slicing
+            action_arrays = {
+                action.column_name: data_group[action.column_name].to_numpy()
+                for action in column_actions
+            }
+            original_indices_arr = data_group["_original_index"].to_numpy()
+
+            for local_idx, (tgt_idx, tgt_row) in enumerate(target_group.iterrows()):
+                overlap_row = overlap[local_idx]
+                mask = overlap_row > 0
+                if not mask.any():
+                    continue  # this target row gets NaNs (handled after loop)
+                target_length = tgt_lengths[local_idx]
+
+                aggregated_values: list[Any] = []
+                for action in column_actions:
+                    values = action_arrays[action.column_name][mask]
+                    overlaps = overlap_row[mask]
+                    lengths = data_lengths[mask]
+                    indices = original_indices_arr[mask]
+                    if len(values) == 0:
+                        aggregated_values.append(np.nan)
+                        continue
+
+                    valid = ~pd.isna(values)
+                    if not valid.any():
+                        aggregated_values.append(np.nan)
+                        continue
+
+                    values = values[valid]
+                    overlaps = overlaps[valid]
+                    lengths = lengths[valid]
+                    indices = indices[valid]
+
+                    agg_value = _aggregate(
+                        action,
+                        values=values,
+                        overlaps=overlaps,
+                        data_lengths=lengths,
+                        target_length=target_length,
+                        source_indices=indices,
+                    )
+                    aggregated_values.append(agg_value)
+
+                result_buffer.append(aggregated_values)
+                result_index.append(tgt_idx)
 
     # ---------- Assemble output ----------
     merged = target.join(
@@ -945,6 +967,7 @@ def on_slk_intervals_fallback(
     data_groups: Optional[Dict[tuple, pd.DataFrame]] = None,
     skip_validation: bool = False,
     perf_origin: str = "legacy",
+    verbose: bool = False,
 ) -> pd.DataFrame:
     """Merge interval data using the categorical-friendly fallback path.
 
@@ -1022,9 +1045,10 @@ def on_slk_intervals_fallback(
         data_groups = _build_data_groups(data_subset, join_left)
 
     target_groups = target.groupby(join_left, sort=False)
-    print(
-        f"[merge_segments] Running categorical fallback across {len(column_actions)} action(s) and {target_groups.ngroups} group(s)."
-    )
+    if verbose:
+        print(
+            f"[merge_segments] Running categorical fallback across {len(column_actions)} action(s) and {target_groups.ngroups} group(s)."
+        )
 
     def _aggregate(
         action: Action,
@@ -1121,75 +1145,83 @@ def on_slk_intervals_fallback(
     result_buffer: list[list[Any]] = []
     result_index: list[Any] = []
 
-    for key, target_group in tqdm(
-        target_groups, total=target_groups.ngroups, desc="merge_segments fallback"
-    ):
-        key_tuple = _normalize_group_key(key)
-        data_group = data_groups.get(key_tuple)
-        if data_group is None:
-            continue
+    # Suppress pandas warnings unless verbose mode is enabled
+    import warnings
 
-        tgt_starts = target_group[slk_from].to_numpy(dtype=float)
-        tgt_ends = target_group[slk_to].to_numpy(dtype=float)
-        tgt_lengths = tgt_ends - tgt_starts
+    with warnings.catch_warnings():
+        if not verbose:
+            warnings.filterwarnings("ignore", category=FutureWarning)
+            warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
 
-        data_starts = data_group[slk_from].to_numpy(dtype=float)
-        data_ends = data_group[slk_to].to_numpy(dtype=float)
-        data_lengths = data_group["_segment_len"].to_numpy(dtype=float)
-
-        overlap = np.minimum(tgt_ends[:, None], data_ends[None, :]) - np.maximum(
-            tgt_starts[:, None], data_starts[None, :]
-        )
-        overlap = np.where(overlap > 0, overlap, 0.0)
-
-        if (overlap > 0).sum() == 0:
-            continue
-
-        action_arrays = {
-            action.column_name: data_group[action.column_name].to_numpy()
-            for action in column_actions
-        }
-        original_indices_arr = data_group["_original_index"].to_numpy()
-
-        for local_idx, (tgt_idx, _) in enumerate(target_group.iterrows()):
-            overlap_row = overlap[local_idx]
-            mask = overlap_row > 0
-            if not mask.any():
+        for key, target_group in tqdm(
+            target_groups, total=target_groups.ngroups, desc="merge_segments fallback"
+        ):
+            key_tuple = _normalize_group_key(key)
+            data_group = data_groups.get(key_tuple)
+            if data_group is None:
                 continue
-            target_length = tgt_lengths[local_idx]
 
-            aggregated_values: list[Any] = []
-            for action in column_actions:
-                values = action_arrays[action.column_name][mask]
-                overlaps = overlap_row[mask]
-                lengths = data_lengths[mask]
-                indices = original_indices_arr[mask]
-                if len(values) == 0:
-                    aggregated_values.append(np.nan)
+            tgt_starts = target_group[slk_from].to_numpy(dtype=float)
+            tgt_ends = target_group[slk_to].to_numpy(dtype=float)
+            tgt_lengths = tgt_ends - tgt_starts
+
+            data_starts = data_group[slk_from].to_numpy(dtype=float)
+            data_ends = data_group[slk_to].to_numpy(dtype=float)
+            data_lengths = data_group["_segment_len"].to_numpy(dtype=float)
+
+            overlap = np.minimum(tgt_ends[:, None], data_ends[None, :]) - np.maximum(
+                tgt_starts[:, None], data_starts[None, :]
+            )
+            overlap = np.where(overlap > 0, overlap, 0.0)
+
+            if (overlap > 0).sum() == 0:
+                continue
+
+            action_arrays = {
+                action.column_name: data_group[action.column_name].to_numpy()
+                for action in column_actions
+            }
+            original_indices_arr = data_group["_original_index"].to_numpy()
+
+            for local_idx, (tgt_idx, _) in enumerate(target_group.iterrows()):
+                overlap_row = overlap[local_idx]
+                mask = overlap_row > 0
+                if not mask.any():
                     continue
+                target_length = tgt_lengths[local_idx]
 
-                valid = ~pd.isna(values)
-                if not valid.any():
-                    aggregated_values.append(np.nan)
-                    continue
+                aggregated_values: list[Any] = []
+                for action in column_actions:
+                    values = action_arrays[action.column_name][mask]
+                    overlaps = overlap_row[mask]
+                    lengths = data_lengths[mask]
+                    indices = original_indices_arr[mask]
+                    if len(values) == 0:
+                        aggregated_values.append(np.nan)
+                        continue
 
-                values = values[valid]
-                overlaps = overlaps[valid]
-                lengths = lengths[valid]
-                indices = indices[valid]
+                    valid = ~pd.isna(values)
+                    if not valid.any():
+                        aggregated_values.append(np.nan)
+                        continue
 
-                agg_value = _aggregate(
-                    action,
-                    values=values,
-                    overlaps=overlaps,
-                    data_lengths=lengths,
-                    target_length=target_length,
-                    source_indices=indices,
-                )
-                aggregated_values.append(agg_value)
+                    values = values[valid]
+                    overlaps = overlaps[valid]
+                    lengths = lengths[valid]
+                    indices = indices[valid]
 
-            result_buffer.append(aggregated_values)
-            result_index.append(tgt_idx)
+                    agg_value = _aggregate(
+                        action,
+                        values=values,
+                        overlaps=overlaps,
+                        data_lengths=lengths,
+                        target_length=target_length,
+                        source_indices=indices,
+                    )
+                    aggregated_values.append(agg_value)
+
+                result_buffer.append(aggregated_values)
+                result_index.append(tgt_idx)
 
     merged = target.join(
         pd.DataFrame(
