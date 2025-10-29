@@ -46,8 +46,8 @@ def plot_dist(ax: plt.Axes, df, title=None, height=None):
     if height is not None:
         for patch, draw_height in zip(ax.patches, draw_heights):
             ax.text(
-                patch.get_x() + patch.get_width() / 2,
-                patch.get_y() + patch.get_height(),
+                patch.get_x() + patch.get_width() / 2,  # type: ignore[attr-defined]
+                patch.get_y() + patch.get_height(),  # type: ignore[attr-defined]
                 "nan" if np.isnan(draw_height) else str(round(draw_height * 100) / 100),
                 va="bottom",
                 ha="center",

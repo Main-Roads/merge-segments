@@ -75,6 +75,7 @@ res = merge.on_slk_intervals(
             "cat_1", rename="cat", aggregation=merge.Aggregation.KeepLongest()
         ),
     ],
+    from_to=("slk_from", "slk_to"),
 )
 
 print(res)
