@@ -16,3 +16,4 @@ ephemeral/
 .coverage
 coverage.xml
 htmlcov/
+check_code.bat

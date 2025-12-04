@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from merge_segments import merge as merge
 from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
 from matplotlib.ticker import MultipleLocator, AutoMinorLocator
 
 
@@ -12,7 +13,7 @@ class cn:
     value = "value"
 
 
-def plot_dist(ax: plt.Axes, df, title=None, height=None):
+def plot_dist(ax: Axes, df, title=None, height=None):
     if height is None:
         draw_heights = [20 for item in df.index]
     else:
