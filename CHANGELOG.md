@@ -8,6 +8,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Nothing yet.
 
+## [1.1.0] - 2025-12-22
+
+### Added
+- Numba-accelerated sparse merge implementation (`_numba_merge.py`) to avoid OOM on large datasets and improve performance.
+- Tests covering the Numba path and a new benchmarking script (`benchmarks/compare_merges.py`) to compare legacy, optimized, and numba implementations.
+- CI/tooling updates: switched from Black to Ruff, updated `nox` sessions, and clarified dev install instructions.
+
+### Changed
+- Bumped requires-python to >= 3.10 and adjusted docs.
+
 ## [1.0.0] - 2025-10-22
 
 ### Added

@@ -120,7 +120,7 @@ To install a specific version or branch:
 
 ```powershell
 # Install a specific version tag
-python -m pip install git+https://github.com/Main-Roads/merge-segments.git@v1.0.0
+python -m pip install git+https://github.com/Main-Roads/merge-segments.git@v1.1.0
 
 # Install a specific branch
 python -m pip install git+https://github.com/Main-Roads/merge-segments.git@branch-name
@@ -566,7 +566,7 @@ User-facing changes are recorded in [`CHANGELOG.md`](./CHANGELOG.md). Each
 release entry summarises new features, bug fixes, and deprecations so consumers
 can assess impact before upgrading.
 
-Latest release: **1.0.0** (2025-10-22).
+Latest release: **1.1.0** (2025-12-22).
 
 ### 5.3. Static Type Checking
 

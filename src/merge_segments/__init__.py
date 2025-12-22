@@ -22,7 +22,7 @@ from .merge import (  # noqa: F401 - re-exported for convenience
 try:
     __version__ = version("merge_segments")
 except PackageNotFoundError:  # pragma: no cover - during local editing
-    __version__ = "0.0.0"
+    __version__ = "1.1.0"
 
 __all__ = [
     "Action",
