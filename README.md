@@ -107,7 +107,7 @@ behaviour explicitly documented in this README.
 
 ### 3.1. Recommended Environment Setup
 
-Create an isolated environment before installing to keep dependencies tidy:
+This package requires **Python 3.10 or later**. Create an isolated environment before installing to keep dependencies tidy:
 
 ```powershell
 python -m venv .venv
@@ -150,8 +150,7 @@ python -m pip install "git+https://github.com/Main-Roads/merge-segments.git#egg=
 
 ### 3.3. Development Install
 
-Contributors can clone the repository and install the pinned toolchain with the
-provided requirements file:
+Contributors can clone the repository and install the development toolchain using the project extras declared in `pyproject.toml`:
 
 ```powershell
 git clone https://github.com/Main-Roads/merge-segments.git
@@ -159,11 +158,10 @@ cd merge-segments
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -r requirements-dev.txt
+python -m pip install ".[dev]"
 ```
 
-This installs the package in editable mode with optional extras, plus linters,
-type checkers, and the test stack declared in `pyproject.toml`.
+This installs the package in editable mode with development extras (linters, type checkers, test helpers) as declared in `pyproject.toml`.
 
 ## 4. Module `merge`
 
