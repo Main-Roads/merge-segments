@@ -12,9 +12,9 @@ LINT_TARGETS = ("src", "tests", "benchmarks")
 @nox.session(reuse_venv=True)
 def lint(session: nox.Session) -> None:
     """Run format and lint checks."""
-    session.install("black>=24.8", "ruff>=0.6.9")
+    session.install("ruff>=0.6.9")
     session.install(".[progress,plotting]")
-    session.run("python", "-m", "black", "--check", *LINT_TARGETS)
+    session.run("python", "-m", "ruff", "format", "--check", *LINT_TARGETS)
     session.run("python", "-m", "ruff", "check", *LINT_TARGETS)
 
 

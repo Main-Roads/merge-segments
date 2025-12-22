@@ -9,16 +9,15 @@ maintainers = [
 ]
 description = "A tool for merging data onto a road network segmentation"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = [
   "pandas>=1.5",
   "deprecated>=1.2",
   "numpy>=1.22",
+  "numba>=0.63.1",
 ]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -32,11 +31,13 @@ progress = [
 plotting = [
   "matplotlib>=3.7",
 ]
+performance = [
+  "numba>=0.57",
+]
 dev = [
   "pytest>=8.4",
   "pytest-cov>=5.0",
   "mypy>=1.18",
-  "black>=25.9",
   "ruff>=0.14",
   "nox>=2024.4",
   "pre-commit>=4.3",
@@ -66,6 +67,11 @@ addopts = "-ra -v --tb=short --capture=no"
 # -q            : quiet
 # --tb=short    : shorter error messages
 # --capture=no  : disable pytest comment capture behaviour
+# Register custom markers to avoid PyTestUnknownMarkWarning
+markers = [
+  "slow: marks tests as slow (use -m 'not slow' to skip)"
+]
+
 testpaths = [
   "tests"
 ]

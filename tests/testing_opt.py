@@ -124,7 +124,7 @@ print(
     f"The optimized result matches the legacy result: {res_legacy.equals(res_optimized)}"
 )
 print(
-    f"The optimized has improved the speed by a factor of {legacy_time / (optimized_time) }"
+    f"The optimized has improved the speed by a factor of {legacy_time / (optimized_time)}"
 )
 exit()
 

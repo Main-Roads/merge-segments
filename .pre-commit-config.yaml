@@ -6,16 +6,9 @@
 repos:
   - repo: local
     hooks:
-      - id: black
-        name: black
-        entry: python -m black
-        language: system
-        types: [python]
-        require_serial: true
-      
       - id: ruff
         name: ruff
-        entry: python -m ruff check
+        entry: uv run ruff check
         language: system
         types: [python]
         require_serial: true

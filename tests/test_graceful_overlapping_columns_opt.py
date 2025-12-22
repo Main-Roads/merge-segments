@@ -47,7 +47,6 @@ def test_graceful_overlapping_columns_error():
             "Cannot merge column 'category' as 'measure' into target because the target already contains a column named 'measure'."
         ),
     ):
-
         merge.on_slk_intervals_optimized(
             target=segments,
             data=data,

@@ -112,11 +112,10 @@ def test_verbose_true_shows_output():
     sys.stdout = old_stdout
     output = captured_output.getvalue()
 
-    # Should contain diagnostic message about fallback for categorical column
-    assert (
-        "[merge_segments] Falling back to categorical path for columns: pavement_type"
-        in output
-    )
+    # Should contain diagnostic message from numba merge
+    assert "[merge_segments] Numba sparse merge:" in output
+    assert "action(s)" in output
+    assert "group(s)" in output
 
     # Result should still be valid
     assert len(result) == 2

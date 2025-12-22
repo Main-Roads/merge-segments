@@ -60,7 +60,7 @@ def plot_dist(ax: Axes, df, title=None, height=None):
 
 
 def plot_seg_vs_merged(seg, dat, test_name):
-    mer = merge.on_slk_intervals_optimized(
+    mer = merge.on_slk_intervals(
         target=seg,
         data=dat,
         join_left=[cn.road],

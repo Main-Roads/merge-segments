@@ -312,6 +312,39 @@ def run_benchmark(config: BenchmarkConfig) -> None:
     print(f"  Optimized: {optimized_time:.2f} s")
     print(f"  Speedup  : {speedup:.2f}x")
 
+    # Numba benchmark (optional)
+    if getattr(merge_module, "is_numba_available", lambda: False)():
+        # Warm-up to trigger JIT compilation outside timing loop
+        try:
+            merge_module.on_slk_intervals_numba(target, data, join_left, actions, from_to, verbose=False)
+        except Exception:
+            # Ignore warm-up errors - timed run below will surface any problems
+            pass
+
+        numba_time, numba_result = _time_function(
+            merge_module.on_slk_intervals_numba,
+            target,
+            data,
+            join_left,
+            actions,
+            from_to,
+            repeats=config.repeats,
+        )
+
+        # Validate results match existing implementations
+        assert_frame_equal(
+            legacy_result.sort_index(axis=1), numba_result.sort_index(axis=1)
+        )
+
+        numba_speedup_vs_legacy = legacy_time / numba_time if numba_time else float("inf")
+        numba_speedup_vs_optimized = optimized_time / numba_time if numba_time else float("inf")
+
+        print(f"  Numba    : {numba_time:.2f} s")
+        print(f"  Speedup vs Legacy   : {numba_speedup_vs_legacy:.2f}x")
+        print(f"  Speedup vs Optimized: {numba_speedup_vs_optimized:.2f}x")
+    else:
+        print("  Numba    : (unavailable) - skipping Numba benchmark")
+
 
 def parse_args() -> BenchmarkConfig:
     parser = argparse.ArgumentParser(description="Benchmark merge_segments helpers")

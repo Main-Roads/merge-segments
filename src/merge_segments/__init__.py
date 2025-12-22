@@ -11,9 +11,11 @@ from .merge import (  # noqa: F401 - re-exported for convenience
     Action,
     Aggregation,
     configure_performance_logger,
+    is_numba_available,
     on_slk_intervals,
     on_slk_intervals_auto,
     on_slk_intervals_fallback,
+    on_slk_intervals_numba,
     on_slk_intervals_optimized,
 )
 
@@ -26,9 +28,11 @@ __all__ = [
     "Action",
     "Aggregation",
     "configure_performance_logger",
+    "is_numba_available",
     "on_slk_intervals",
     "on_slk_intervals_auto",
     "on_slk_intervals_fallback",
+    "on_slk_intervals_numba",
     "on_slk_intervals_optimized",
     "__version__",
 ]

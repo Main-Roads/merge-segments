@@ -13,6 +13,33 @@ from pandas.api.types import is_numeric_dtype
 from . import _validation as validation
 from .exceptions import PercentileConfigurationError
 
+# Try to import Numba-accelerated implementation
+try:
+    from ._numba_merge import on_slk_intervals_numba, is_numba_available
+
+    _NUMBA_AVAILABLE = True
+except ImportError:
+    _NUMBA_AVAILABLE = False
+
+    def is_numba_available() -> bool:
+        """Check if Numba is available for acceleration."""
+        return False
+
+    def on_slk_intervals_numba(
+        target: Any,
+        data: Any,
+        join_left: List[str],
+        column_actions: List[Any],
+        from_to: Tuple[str, str],
+        verbose: bool = False,
+    ) -> Any:
+        """Fallback stub when Numba is not installed."""
+        raise ImportError(
+            "Numba is required for on_slk_intervals_numba. "
+            "Install with: pip install merge_segments[performance]"
+        )
+
+
 _T = TypeVar("_T")
 
 PerformanceMetrics = Dict[str, float]
@@ -393,9 +420,7 @@ def on_slk_intervals_legacy(
             # create a blank row to store the result of each column
             aggregated_result_row: list[Any] = []
             for column_action_index, column_action in enumerate(column_actions):
-                column_len_to_aggregate: (
-                    pd.DataFrame
-                ) = data_to_aggregate_for_target_group.loc[
+                column_len_to_aggregate: pd.DataFrame = data_to_aggregate_for_target_group.loc[
                     :, [column_action.column_name]
                 ].assign(
                     overlap_len=overlap_len
@@ -594,6 +619,21 @@ def on_slk_intervals(
             verbose=verbose,
         )
     else:
+        # Prefer Numba-accelerated implementation when available
+        try:
+            if is_numba_available():
+                return on_slk_intervals_numba(
+                    target=target,
+                    data=data,
+                    join_left=join_left,
+                    column_actions=column_actions,
+                    from_to=from_to,
+                    verbose=verbose,
+                )
+        except Exception:
+            # If checking availability or calling numba raises, fall back to optimized
+            pass
+
         return on_slk_intervals_optimized(
             target=target,
             data=data,
