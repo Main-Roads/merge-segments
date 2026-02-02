@@ -132,7 +132,8 @@ jobs:
       - name: Build distributions
         run: |
           uv sync --extra dev
-          uv run pip install build
+          uv run python -m pip install --upgrade pip
+          uv run python -m pip install build
           uv run python -m build
 
       - name: Install wheel in isolated environment
