@@ -316,7 +316,9 @@ def run_benchmark(config: BenchmarkConfig) -> None:
     if getattr(merge_module, "is_numba_available", lambda: False)():
         # Warm-up to trigger JIT compilation outside timing loop
         try:
-            merge_module.on_slk_intervals_numba(target, data, join_left, actions, from_to, verbose=False)
+            merge_module.on_slk_intervals_numba(
+                target, data, join_left, actions, from_to, verbose=False
+            )
         except Exception:
             # Ignore warm-up errors - timed run below will surface any problems
             pass
@@ -336,8 +338,12 @@ def run_benchmark(config: BenchmarkConfig) -> None:
             legacy_result.sort_index(axis=1), numba_result.sort_index(axis=1)
         )
 
-        numba_speedup_vs_legacy = legacy_time / numba_time if numba_time else float("inf")
-        numba_speedup_vs_optimized = optimized_time / numba_time if numba_time else float("inf")
+        numba_speedup_vs_legacy = (
+            legacy_time / numba_time if numba_time else float("inf")
+        )
+        numba_speedup_vs_optimized = (
+            optimized_time / numba_time if numba_time else float("inf")
+        )
 
         print(f"  Numba    : {numba_time:.2f} s")
         print(f"  Speedup vs Legacy   : {numba_speedup_vs_legacy:.2f}x")
