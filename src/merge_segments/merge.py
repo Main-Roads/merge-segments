@@ -284,6 +284,20 @@ def _normalize_group_key(values) -> tuple:
     return (values,)
 
 
+def _keep_longest_tie_first(values: Any, overlaps: Any) -> Any:
+    """Return the value with the largest total overlap, preferring first-seen ties."""
+
+    codes, uniques = pd.factorize(values, sort=False)
+    if len(uniques) == 0:
+        return np.nan
+    totals = np.bincount(
+        codes,
+        weights=np.asarray(overlaps, dtype=float),
+        minlength=len(uniques),
+    )
+    return uniques[int(totals.argmax())]
+
+
 def _build_data_groups(
     data_subset: pd.DataFrame, join_left: List[str]
 ) -> Dict[tuple, pd.DataFrame]:
@@ -328,6 +342,7 @@ def _validate_inputs(
     validation.ensure_nonzero_lengths("target", target_df, slk_from, slk_to)
     validation.ensure_nonzero_lengths("data", data_df, slk_from, slk_to)
     validation.ensure_output_columns_available(target_df.columns, column_actions)
+    validation.ensure_aggregation_column_types(data_df, column_actions)
 
     return target_df, data_df
 
@@ -467,9 +482,10 @@ def on_slk_intervals_legacy(
 
                 elif column_action.aggregation.type == AggregationType.KeepLongest:
                     aggregated_result_row.append(
-                        column_to_aggregate_overlap_len.groupby(column_to_aggregate)
-                        .sum()
-                        .idxmax()
+                        _keep_longest_tie_first(
+                            column_to_aggregate,
+                            column_to_aggregate_overlap_len,
+                        )
                     )
 
                 elif (
@@ -492,7 +508,11 @@ def on_slk_intervals_legacy(
                         .fillna(0)
                         .cumsum()
                     )
-                    x_coords /= x_coords.iloc[-1]
+                    total = float(x_coords.iloc[-1])
+                    if total <= 0:
+                        aggregated_result_row.append(column_to_aggregate.iloc[-1])
+                        continue
+                    x_coords /= total
                     percentile = column_action.aggregation.percentile
                     if percentile is None:
                         raise ValueError(
@@ -570,6 +590,37 @@ def on_slk_intervals_legacy(
     return result
 
 
+def _run_fast_merge(
+    target: pd.DataFrame,
+    data: pd.DataFrame,
+    join_left: List[str],
+    column_actions: List[Action],
+    from_to: Tuple[str, str],
+    *,
+    verbose: bool = False,
+) -> pd.DataFrame:
+    """Dispatch to the fastest available non-legacy implementation."""
+
+    if is_numba_available():
+        return on_slk_intervals_numba(
+            target=target,
+            data=data,
+            join_left=join_left,
+            column_actions=column_actions,
+            from_to=from_to,
+            verbose=verbose,
+        )
+
+    return on_slk_intervals_optimized(
+        target=target,
+        data=data,
+        join_left=join_left,
+        column_actions=column_actions,
+        from_to=from_to,
+        verbose=verbose,
+    )
+
+
 def on_slk_intervals(
     target: pd.DataFrame,
     data: pd.DataFrame,
@@ -583,7 +634,9 @@ def on_slk_intervals(
 
     This is the main entry point for merging interval-based data. By default,
     it uses the legacy implementation for backwards compatibility. Set
-    ``legacy=False`` to use the optimized vectorized implementation.
+    ``legacy=False`` to use the fastest available optimized implementation.
+    When Numba is installed, that path uses the sparse Numba backend;
+    otherwise it falls back to the vectorized dense-overlap implementation.
 
     Args:
         target: DataFrame containing the segments onto which data will be merged.
@@ -592,7 +645,7 @@ def on_slk_intervals(
         column_actions: Sequence of Action instances describing aggregations.
         from_to: Tuple containing the start and end column names for intervals.
         legacy: If True (default), uses the legacy implementation. If False,
-            uses the optimized vectorized implementation.
+            uses the fastest available optimized implementation.
         verbose: If True, prints diagnostic messages including fallback notices.
             If False (default), only shows progress bars and suppresses pandas warnings.
 
@@ -603,7 +656,7 @@ def on_slk_intervals(
         >>> # Use legacy implementation (default)
         >>> result = on_slk_intervals(target, data, ["road"], actions, ("from", "to"))
         >>>
-        >>> # Use optimized implementation
+        >>> # Use the fastest available optimized implementation
         >>> result = on_slk_intervals(target, data, ["road"], actions, ("from", "to"), legacy=False)
         >>>
         >>> # Use optimized implementation with verbose output
@@ -618,30 +671,15 @@ def on_slk_intervals(
             from_to=from_to,
             verbose=verbose,
         )
-    else:
-        # Prefer Numba-accelerated implementation when available
-        try:
-            if is_numba_available():
-                return on_slk_intervals_numba(
-                    target=target,
-                    data=data,
-                    join_left=join_left,
-                    column_actions=column_actions,
-                    from_to=from_to,
-                    verbose=verbose,
-                )
-        except Exception:
-            # If checking availability or calling numba raises, fall back to optimized
-            pass
 
-        return on_slk_intervals_optimized(
-            target=target,
-            data=data,
-            join_left=join_left,
-            column_actions=column_actions,
-            from_to=from_to,
-            verbose=verbose,
-        )
+    return _run_fast_merge(
+        target=target,
+        data=data,
+        join_left=join_left,
+        column_actions=column_actions,
+        from_to=from_to,
+        verbose=verbose,
+    )
 
 
 def on_slk_intervals_optimized(
@@ -767,14 +805,7 @@ def on_slk_intervals_optimized(
             return values[idx]
 
         if agg_type == AggregationType.KeepLongest:
-            # sum overlap per category, choose the one with largest summed overlap
-            # values are categorical in this case
-            order = np.argsort(values, kind="mergesort")
-            sorted_vals = values[order]
-            sorted_overlaps = overlaps[order]
-            unique, idx_start = np.unique(sorted_vals, return_index=True)
-            sums = np.add.reduceat(sorted_overlaps, idx_start)
-            return unique[sums.argmax()]
+            return _keep_longest_tie_first(values, overlaps)
 
         if agg_type == AggregationType.LengthWeightedPercentile:
             percentile = action.aggregation.percentile
@@ -863,9 +894,9 @@ def on_slk_intervals_optimized(
             overlap = np.minimum(tgt_ends[:, None], data_ends[None, :]) - np.maximum(
                 tgt_starts[:, None], data_starts[None, :]
             )
-            overlap = np.where(overlap > 0, overlap, 0.0)
+            np.maximum(overlap, 0.0, out=overlap)
 
-            if (overlap > 0).sum() == 0:
+            if not np.any(overlap):
                 # No overlaps at all for this group; skip (all NaNs for each row)
                 continue
 
@@ -876,7 +907,7 @@ def on_slk_intervals_optimized(
             }
             original_indices_arr = data_group["_original_index"].to_numpy()
 
-            for local_idx, (tgt_idx, tgt_row) in enumerate(target_group.iterrows()):
+            for local_idx, tgt_idx in enumerate(target_group.index):
                 overlap_row = overlap[local_idx]
                 mask = overlap_row > 0
                 if not mask.any():
@@ -956,11 +987,12 @@ def on_slk_intervals_auto(
     Args:
         target, data, join_left, column_actions, from_to: See
             :func:`on_slk_intervals` for parameter descriptions.
-        prefer_optimized: When ``True`` the optimized path is used, when ``False``
-            the legacy implementation is enforced. If ``None`` (default), the
-            behaviour is controlled by the ``MERGE_SEGMENTS_DEFAULT_MODE``
-            environment variable (``"optimized"`` or ``"legacy"``). When the
-            variable is unset the optimized implementation is preferred.
+        prefer_optimized: When ``True`` the fastest available optimized path is
+            used, when ``False`` the legacy implementation is enforced. If
+            ``None`` (default), the behaviour is controlled by the
+            ``MERGE_SEGMENTS_DEFAULT_MODE`` environment variable
+            (``"optimized"`` or ``"legacy"``). When the variable is unset the
+            optimized implementation is preferred.
 
     Returns:
         The merged DataFrame produced by either the optimized or legacy helper.
@@ -979,7 +1011,7 @@ def on_slk_intervals_auto(
         prefer_optimized = True
 
     if prefer_optimized:
-        return on_slk_intervals_optimized(
+        return _run_fast_merge(
             target=target,
             data=data,
             join_left=join_left,
@@ -1115,25 +1147,7 @@ def on_slk_intervals_fallback(
             return values[idx_max]
 
         if agg_type == AggregationType.KeepLongest:
-            totals: Dict[object, float] = {}
-            first_idx: Dict[object, int] = {}
-            for loop_index, (val, overlap) in enumerate(zip(values, overlaps)):
-                python_idx = int(loop_index)
-                totals[val] = totals.get(val, 0.0) + float(overlap)
-                if val not in first_idx:
-                    first_idx[val] = python_idx
-            best_value: Optional[object] = None
-            best_total = float("-inf")
-            best_order: int = int(len(values))
-            for val, total in totals.items():
-                order_idx = int(first_idx[val])
-                if total > best_total or (
-                    np.isclose(total, best_total) and order_idx < best_order
-                ):
-                    best_total = float(total)
-                    best_value = val
-                    best_order = order_idx
-            return best_value
+            return _keep_longest_tie_first(values, overlaps)
 
         if agg_type == AggregationType.LengthWeightedPercentile:
             percentile = action.aggregation.percentile
@@ -1212,9 +1226,9 @@ def on_slk_intervals_fallback(
             overlap = np.minimum(tgt_ends[:, None], data_ends[None, :]) - np.maximum(
                 tgt_starts[:, None], data_starts[None, :]
             )
-            overlap = np.where(overlap > 0, overlap, 0.0)
+            np.maximum(overlap, 0.0, out=overlap)
 
-            if (overlap > 0).sum() == 0:
+            if not np.any(overlap):
                 continue
 
             action_arrays = {
@@ -1223,7 +1237,7 @@ def on_slk_intervals_fallback(
             }
             original_indices_arr = data_group["_original_index"].to_numpy()
 
-            for local_idx, (tgt_idx, _) in enumerate(target_group.iterrows()):
+            for local_idx, tgt_idx in enumerate(target_group.index):
                 overlap_row = overlap[local_idx]
                 mask = overlap_row > 0
                 if not mask.any():

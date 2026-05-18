@@ -31,5 +31,9 @@ class OutputCollisionError(MergeSegmentsError):
     """Raised when a requested output column already exists in the target."""
 
 
+class InvalidAggregationError(TypeError, MergeSegmentsError):
+    """Raised when an aggregation is incompatible with the source column dtype."""
+
+
 class PercentileConfigurationError(MergeSegmentsError):
     """Raised when length-weighted percentile arguments are invalid."""

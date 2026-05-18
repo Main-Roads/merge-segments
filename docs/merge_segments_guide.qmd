@@ -1,0 +1,707 @@
+---
+title: "merge_segments: Theory, API Guide, and Developer Notes"
+subtitle: "Mathematical background, aggregation semantics, and implementation guidance"
+date: today
+format:
+  html:
+    theme: cosmo
+    toc: true
+    number-sections: true
+    embed-resources: true
+    code-fold: true
+    code-summary: "Show supporting code"
+  pdf:
+    toc: true
+    number-sections: true
+    geometry:
+      - margin=0.9in
+execute:
+  echo: false
+  warning: false
+  message: false
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+import sys
+from pathlib import Path
+
+import matplotlib
+matplotlib.use("Agg")
+
+import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.patches import Rectangle
+from matplotlib.ticker import AutoMinorLocator, MultipleLocator
+
+
+def find_repo_root() -> Path:
+    cwd = Path.cwd().resolve()
+    for candidate in (cwd, *cwd.parents):
+        if (candidate / "src" / "merge_segments").exists():
+            return candidate
+    raise RuntimeError("Could not locate repository root containing src/merge_segments")
+
+
+REPO_ROOT = find_repo_root()
+SRC_ROOT = REPO_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from merge_segments import (  # noqa: E402
+    Action,
+    Aggregation,
+    configure_performance_logger,
+    is_numba_available,
+    on_slk_intervals,
+    on_slk_intervals_auto,
+    on_slk_intervals_fallback,
+    on_slk_intervals_numba,
+    on_slk_intervals_optimized,
+)
+from merge_segments import merge as merge_module  # noqa: E402
+from merge_segments.exceptions import (  # noqa: E402
+    DuplicateLabelError,
+    InvalidAggregationError,
+    InvalidDataFrameError,
+    InvalidJoinConfigurationError,
+    OutputCollisionError,
+    PercentileConfigurationError,
+    ZeroLengthSegmentError,
+)
+
+
+class cn:
+    road = "road"
+    slk_from = "slk_from"
+    slk_to = "slk_to"
+    value = "value"
+
+
+def plot_dist(ax: Axes, df: pd.DataFrame, title: str | None = None, height=None) -> None:
+    if height is None:
+        draw_heights = [20 for _ in df.index]
+    else:
+        draw_heights = height
+
+    if title is not None:
+        ax.set_title(title)
+
+    ax.bar(
+        x=df[cn.slk_from],
+        height=draw_heights,
+        width=df[cn.slk_to] - df[cn.slk_from],
+        align="edge",
+        linewidth=1,
+        edgecolor="black",
+        alpha=0.6,
+    )
+
+    ax.xaxis.set_tick_params("both", True)
+    ax.xaxis.set_major_locator(MultipleLocator(10))
+    ax.xaxis.set_minor_locator(AutoMinorLocator(5))
+
+    ax.yaxis.set_major_locator(MultipleLocator(100))
+    ax.yaxis.set_minor_locator(AutoMinorLocator(10))
+    ax.set_ymargin(0.1)
+
+    ax.set_axisbelow(True)
+    ax.grid(True, which="minor", axis="both", color="#DDDDDD", linestyle="dotted")
+    ax.grid(True, which="major", axis="both")
+
+    if height is not None:
+        for patch, draw_height in zip(ax.patches, draw_heights):
+            if not isinstance(patch, Rectangle):
+                continue
+            label = "nan" if pd.isna(draw_height) else str(round(float(draw_height), 2))
+            ax.text(
+                patch.get_x() + patch.get_width() / 2,
+                patch.get_y() + patch.get_height(),
+                label,
+                va="bottom",
+                ha="center",
+                fontdict={"size": 8},
+            )
+
+
+def action_specs() -> list[tuple[str, Action]]:
+    return [
+        ("Keep Longest", Action(cn.value, Aggregation.KeepLongest(), rename="Keep Longest")),
+        (
+            "Length Weighted Average",
+            Action(
+                cn.value,
+                Aggregation.LengthWeightedAverage(),
+                rename="Length Weighted Average",
+            ),
+        ),
+        (
+            "75th Percentile (Length Weighted)",
+            Action(
+                cn.value,
+                Aggregation.LengthWeightedPercentile(0.75),
+                rename="75th Percentile",
+            ),
+        ),
+        (
+            "50th Percentile (Length Weighted)",
+            Action(
+                cn.value,
+                Aggregation.LengthWeightedPercentile(0.5),
+                rename="50th Percentile",
+            ),
+        ),
+        ("Average", Action(cn.value, Aggregation.Average(), rename="Average")),
+        ("First", Action(cn.value, Aggregation.First(), rename="First")),
+        (
+            "Proportional Sum Of Data",
+            Action(
+                cn.value,
+                Aggregation.SumProportionOfData(),
+                rename="Proportional Sum",
+            ),
+        ),
+    ]
+
+
+def merge_action_demo(seg: pd.DataFrame, dat: pd.DataFrame, *, legacy: bool = False) -> pd.DataFrame:
+    return on_slk_intervals(
+        target=seg,
+        data=dat,
+        join_left=[cn.road],
+        column_actions=[action for _, action in action_specs()],
+        from_to=(cn.slk_from, cn.slk_to),
+        legacy=legacy,
+    )
+
+
+def render_action_grid(case_name: str, *, legacy: bool = False) -> plt.Figure:
+    seg, dat = CASE_BUILDERS[case_name]()
+    merged = merge_action_demo(seg, dat, legacy=legacy)
+
+    fig, axs = plt.subplots(2, 4, sharex="all", sharey="all", figsize=(13.5, 8.5))
+    fig.subplots_adjust(wspace=0.1, hspace=0.2)
+
+    plot_dist(axs[0, 0], dat, title="Original", height=dat[cn.value])
+    plot_dist(axs[0, 1], merged, title="Keep Longest", height=merged["Keep Longest"])
+    plot_dist(
+        axs[0, 2],
+        merged,
+        title="Length Weighted Average",
+        height=merged["Length Weighted Average"],
+    )
+    plot_dist(
+        axs[1, 0],
+        merged,
+        title="75th Percentile",
+        height=merged["75th Percentile"],
+    )
+    plot_dist(
+        axs[1, 1],
+        merged,
+        title="50th Percentile",
+        height=merged["50th Percentile"],
+    )
+    plot_dist(axs[1, 2], merged, title="Average", height=merged["Average"])
+    plot_dist(axs[0, 3], merged, title="First", height=merged["First"])
+    plot_dist(
+        axs[1, 3],
+        merged,
+        title="Prop. Sum Of Data",
+        height=merged["Proportional Sum"],
+    )
+
+    fig.suptitle(
+        f"{case_name}: render-time reproduction of tests_manual/test_plots/{case_name}.pdf",
+        fontsize=13,
+        y=1.02,
+    )
+    return fig
+
+
+def make_case_1() -> tuple[pd.DataFrame, pd.DataFrame]:
+    seg = pd.DataFrame(
+        [[1, 10, 20], [1, 20, 50], [1, 50, 100]],
+        columns=[cn.road, cn.slk_from, cn.slk_to],
+    )
+    dat = pd.DataFrame(
+        [
+            [1, 0, 15, 500],
+            [1, 15, 30, 600],
+            [1, 30, 40, 450],
+            [1, 40, 45, 420],
+            [1, 45, 60, 400],
+            [1, 60, 80, 600],
+            [1, 80, 85, 540],
+            [1, 90, 105, 470],
+        ],
+        columns=[cn.road, cn.slk_from, cn.slk_to, cn.value],
+    )
+    return seg, dat
+
+
+def make_case_2() -> tuple[pd.DataFrame, pd.DataFrame]:
+    seg = pd.DataFrame(
+        [
+            [1, 10, 20],
+            [1, 20, 30],
+            [1, 30, 40],
+            [1, 40, 50],
+            [1, 50, 60],
+            [1, 60, 70],
+            [1, 70, 80],
+            [1, 80, 90],
+            [1, 90, 100],
+            [1, 100, 110],
+            [1, 110, 120],
+        ],
+        columns=[cn.road, cn.slk_from, cn.slk_to],
+    )
+    dat = pd.DataFrame(
+        [
+            [1, 0, 15, 500],
+            [1, 15, 30, 600],
+            [1, 30, 40, 450],
+            [1, 40, 45, 420],
+            [1, 45, 60, 400],
+            [1, 60, 80, 600],
+            [1, 80, 85, 540],
+            [1, 90, 105, 470],
+        ],
+        columns=[cn.road, cn.slk_from, cn.slk_to, cn.value],
+    )
+    return seg, dat
+
+
+def make_case_3() -> tuple[pd.DataFrame, pd.DataFrame]:
+    seg = pd.DataFrame(
+        [[1, 10, 40], [1, 40, 70], [1, 70, 100], [1, 100, 130], [1, 130, 160]],
+        columns=[cn.road, cn.slk_from, cn.slk_to],
+    )
+    dat = pd.DataFrame(
+        [
+            [1, 10, 20, 500],
+            [1, 20, 30, 510],
+            [1, 30, 40, 540],
+            [1, 40, 50, 320],
+            [1, 50, 60, 530],
+            [1, 60, 70, 530],
+            [1, 70, 80, 520],
+            [1, 80, 90, np.nan],
+            [1, 90, 100, 540],
+            [1, 100, 110, 520],
+            [1, 110, 120, 490],
+            [1, 120, 130, 450],
+        ],
+        columns=[cn.road, cn.slk_from, cn.slk_to, cn.value],
+    )
+    return seg, dat
+
+
+def make_case_4() -> tuple[pd.DataFrame, pd.DataFrame]:
+    seg = pd.DataFrame(
+        [[1, 10, 20], [1, 20, 30], [1, 30, 40]],
+        columns=[cn.road, cn.slk_from, cn.slk_to],
+    )
+    dat = pd.DataFrame(
+        [[1, 0, 15, 300], [1, 15, 35, 500], [1, 35, 50, 400]],
+        columns=[cn.road, cn.slk_from, cn.slk_to, cn.value],
+    )
+    return seg, dat
+
+
+def make_case_5() -> tuple[pd.DataFrame, pd.DataFrame]:
+    seg = pd.DataFrame([[1, 10, 90]], columns=[cn.road, cn.slk_from, cn.slk_to])
+    dat = pd.DataFrame(
+        [[1, 5, 40, 400], [1, 40, 50, 500], [1, 50, 95, 300]],
+        columns=[cn.road, cn.slk_from, cn.slk_to, cn.value],
+    )
+    return seg, dat
+
+
+CASE_BUILDERS = {
+    "test_plot_1": make_case_1,
+    "test_plot_2": make_case_2,
+    "test_plot_3": make_case_3,
+    "test_plot_4": make_case_4,
+    "test_plot_5": make_case_5,
+}
+```
+
+## Problem Model
+
+`merge_segments` merges interval-valued measurements from a `data` table onto a `target` segmentation. A row in `target` says "produce one output for this interval". A row in `data` says "this value applies over this interval". Rows are only compared inside matching `join_left` groups.
+
+For a target interval $T_i = [a_i, b_i)$ and a data interval $D_j = [c_j, d_j)$ in the same join group, the overlap length is
+
+$$
+\ell_{ij} = \max\left(0, \min(b_i, d_j) - \max(a_i, c_j)\right).
+$$
+
+Only rows with $\ell_{ij} > 0$ contribute to the aggregation for target row $i$. The library treats intervals as half-open ranges: start inclusive, end exclusive.
+
+The merge is groupwise and rowwise:
+
+1. Partition both frames by `join_left`.
+2. For each target row, find overlapping data rows in the same group.
+3. Reduce the overlapping values with one aggregation per requested `Action`.
+4. Join the aggregated columns back onto the original target rows.
+
+Rows with no overlap produce `NaN` in the derived columns. For each action, `NaN` source values are ignored before the reduction is applied.
+
+## Mathematical Background
+
+Let $v_j$ be the data value on overlapping row $j$, $\ell_j$ the overlap length with the current target row, $L_j = d_j - c_j$ the original data-segment length, and $H = b_i - a_i$ the current target length.
+
+### Core reduction formulas
+
+| Aggregation | Definition | Typical use |
+| --- | --- | --- |
+| `Average()` | $\frac{1}{n}\sum_j v_j$ over non-null overlaps | Simple mean when each overlapping row should count equally |
+| `LengthWeightedAverage()` | $\frac{\sum_j v_j\ell_j}{\sum_j \ell_j}$ | Continuous measurements such as width, roughness, or rate |
+| `SumProportionOfData()` | $\sum_j v_j\frac{\ell_j}{L_j}$ | Totals attached to the source segment length |
+| `SumProportionOfTarget()` | $\frac{\sum_j v_j\ell_j}{H}$ | Rates or percentages normalized to the target length |
+| `Sum()` | $\sum_j v_j$ | Whole-value accumulation when any touch should count fully |
+| `Max()` / `Min()` | $\max_j v_j$, $\min_j v_j$ | Numeric envelopes |
+| `IndexOfMax()` / `IndexOfMin()` | Index of the row achieving the extreme value | Trace the contributing source row |
+
+### Order-sensitive and categorical reductions
+
+| Aggregation | Definition | Notes |
+| --- | --- | --- |
+| `First()` | First overlapping non-null value in input row order | Use when source order is semantically meaningful |
+| `KeepLongest()` | Choose the distinct value $u$ maximizing $\sum_{j:v_j=u}\ell_j$ | Ties are resolved by first appearance in the overlapping rows |
+| `KeepLongestSegment()` | Choose the value from the single row with largest overlap | Deprecated because it is segment-based, not value-based |
+
+`KeepLongest()` is the important distinction in this codebase. It does not ask "which single row overlaps the most?" It asks "which distinct value owns the most total overlap?" If the same category appears on multiple touching rows, their overlap lengths are accumulated before choosing the winner.
+
+### Length-weighted percentile
+
+`LengthWeightedPercentile(p)` sorts the overlapping values ascending, keeps the same overlap weights, constructs cumulative coordinates from adjacent half-weight averages, normalizes those coordinates to $[0, 1]$, and interpolates at percentile $p$.
+
+For sorted pairs $(v_{(k)}, \ell_{(k)})$, the implementation uses
+
+$$
+x_1 = 0, \qquad
+x_k = \sum_{r=1}^{k-1} \frac{\ell_{(r)} + \ell_{(r+1)}}{2} \quad \text{for } k > 1,
+$$
+
+then rescales by $x_m$ and interpolates on the sorted values. This is why the weighted percentile is not simply a cumulative weighted quantile by raw segment length; it is center-point interpolation over ordered segment values.
+
+## Quick Start
+
+For new code, the most practical entry point is usually `on_slk_intervals(..., legacy=False)`. That preserves the main public function while allowing the fastest available backend.
+
+```python
+from merge_segments import Action, Aggregation, on_slk_intervals
+
+result = on_slk_intervals(
+    target=segmentation,
+    data=measurements,
+    join_left=["road_no", "carriageway"],
+    column_actions=[
+        Action("pavement_width", Aggregation.LengthWeightedAverage()),
+        Action("surface_type", Aggregation.KeepLongest(), rename="surface_type_majority"),
+    ],
+    from_to=("slk_from", "slk_to"),
+    legacy=False,
+)
+```
+
+The simple three-target scenario below is rendered live during the Quarto build.
+
+```{python}
+#| label: tbl-case-4
+#| tbl-cap: Output for the simple three-target scenario used in `test_plot_4`
+seg_case_4, dat_case_4 = make_case_4()
+(
+    merge_action_demo(seg_case_4, dat_case_4, legacy=False)
+    .round(2)
+    .rename(
+        columns={
+            "slk_from": "from",
+            "slk_to": "to",
+            "Keep Longest": "keep",
+            "Length Weighted Average": "LWA",
+            "75th Percentile": "P75",
+            "50th Percentile": "P50",
+            "Average": "avg",
+            "Proportional Sum": "prop_sum",
+        }
+    )
+)
+```
+
+Table 1 uses compact labels to keep the PDF layout within the page width: `LWA` is length-weighted average, `P75` and `P50` are the length-weighted 75th and 50th percentiles, and `prop_sum` is `SumProportionOfData()`.
+
+## Which API To Use Where
+
+### Package-root exports
+
+These are available directly from `merge_segments`.
+
+| API | Use this when | Notes |
+| --- | --- | --- |
+| `Action` | You need one output column definition | Combines source column, aggregation, and optional rename |
+| `Aggregation` | You need to declare how a column should be reduced | Prefer the factory methods instead of constructing enums directly |
+| `on_slk_intervals` | You want the stable top-level entry point | Default is legacy mode; set `legacy=False` for the fast path |
+| `on_slk_intervals_auto` | You want environment-controlled dispatch | Reads `MERGE_SEGMENTS_DEFAULT_MODE` unless `prefer_optimized` is supplied |
+| `on_slk_intervals_optimized` | You explicitly want the dense vectorized backend | Good for benchmarking or forcing the non-Numba fast path |
+| `on_slk_intervals_numba` | You explicitly want the sparse Numba backend | Best raw speed when Numba is installed; fails if unavailable |
+| `on_slk_intervals_fallback` | You need the categorical-safe backend directly | Rarely needed in application code; used automatically when needed |
+| `is_numba_available` | You need a feature check before choosing a backend | Useful in diagnostics or deployment checks |
+| `configure_performance_logger` | You want timing and action-count metrics | Register one callback for performance events |
+| `__version__` | You need runtime version metadata | Comes from installed package metadata |
+
+### Module-level API in `merge_segments.merge`
+
+| API | Use this when | Notes |
+| --- | --- | --- |
+| `on_slk_intervals_legacy` | You need the original row-by-row implementation explicitly | Conservative path, slower, not exported at the package root |
+| `AggregationType` | You are working on internals | Not the recommended construction surface for user code |
+
+### Recommended selection rules
+
+1. Use `on_slk_intervals(..., legacy=False)` for most new application code.
+2. Keep `on_slk_intervals(..., legacy=True)` only when preserving long-standing behavior matters more than throughput.
+3. Use `on_slk_intervals_auto(...)` when you want deployment-time switching through `MERGE_SEGMENTS_DEFAULT_MODE`.
+4. Call `on_slk_intervals_numba(...)` directly only when Numba is a hard requirement and you want failure instead of fallback.
+5. Call `on_slk_intervals_fallback(...)` directly only for debugging, regression testing, or explicitly categorical-heavy workflows.
+
+## `Action` And `Aggregation`
+
+An `Action` tells the merge which source column to read, how to aggregate it, and what the output column should be called.
+
+```python
+Action("pavement_width", Aggregation.LengthWeightedAverage(), rename="width_lwa")
+```
+
+### Aggregation factories
+
+The chart suite in the next section visualizes the seven most geometric aggregation behaviors. The remaining selectors and extrema are still important for development work, so they are listed here as well.
+
+All factory names below are methods on `Aggregation`, so the table omits the repeated `Aggregation.` prefix to keep the PDF layout within the page width.
+
+| Factory | Output dtype expectation | Use where |
+| --- | --- | --- |
+| `KeepLongest()` | Any dtype | Dominant categorical or label-valued interval by total overlap |
+| `First()` | Any dtype | Ordered source streams where first-hit semantics matter |
+| `Average()` | Numeric | Unweighted mean of overlapping values |
+| `LengthWeightedAverage()` | Numeric | Continuous measurements averaged by overlap length |
+| `LengthWeightedPercentile(p)` | Numeric | Upper or lower weighted envelopes without collapsing to min or max |
+| `SumProportionOfData()` | Numeric | Apportion a source total to the overlapped fraction of the source row |
+| `SumProportionOfTarget()` | Numeric | Normalize overlap contribution to the target interval length |
+| `Sum()` | Numeric | Count the whole source value whenever there is any overlap |
+| `Max()` / `Min()` | Numeric | Keep only numeric extremes |
+| `IndexOfMax()` / `IndexOfMin()` | Numeric | Recover the original source row index for the winning extreme |
+
+### Deprecated compatibility factories
+
+| Factory | Status | Replacement |
+| --- | --- | --- |
+| `KeepLongestSegment()` | Deprecated | `KeepLongest()` |
+| `ProportionalSum()` | Deprecated alias | `SumProportionOfData()` |
+
+### Numeric-only validation rules
+
+The current validation layer rejects non-numeric source columns for the following aggregations:
+
+- `Average`
+- `LengthWeightedAverage`
+- `LengthWeightedPercentile`
+- `SumProportionOfData`
+- `SumProportionOfTarget`
+- `Sum`
+- `IndexOfMax`
+- `IndexOfMin`
+- `Min`
+- `Max`
+
+That means string and categorical columns are valid for `KeepLongest()` and `First()`, but not for arithmetic or extrema-based reductions.
+
+## Visual Guide To Aggregation Behavior
+
+The next figures are rendered by Python during Quarto execution and reproduce the same scenario families as `tests_manual/test_plots/test_plot_1.pdf` through `tests_manual/test_plots/test_plot_5.pdf`. They are the most direct way to see how the major aggregation strategies differ.
+
+### How to read the plots
+
+1. The top-left panel is the original `data` series.
+2. Every other panel shows the merged output on the `target` segmentation.
+3. Differences between panels are caused only by the aggregation rule, not by a change in source data.
+
+### Case 1: mixed target widths against several source intervals
+
+This is the baseline visual comparison. It shows the difference between unweighted and overlap-weighted reductions clearly.
+
+```{python}
+#| label: fig-case-1
+#| fig-cap: Case 1 reproduces `test_plot_1` from `tests_manual/test_plots`.
+#| out-width: 100%
+render_action_grid("test_plot_1", legacy=False)
+```
+
+Interpretation:
+
+- `Keep Longest` follows the value owning the most total overlap within each target row.
+- `First` follows source order, so it can differ sharply from both the weighted and unweighted averages.
+- `75th Percentile` skews upward relative to `50th Percentile` and the average.
+- `Proportional Sum Of Data` accumulates partial contributions from each data segment rather than averaging them.
+
+### Case 2: fine target segmentation
+
+Finer targets make local transitions obvious and show when `First` changes before or after a dominant weighted result.
+
+```{python}
+#| label: fig-case-2
+#| fig-cap: Case 2 reproduces `test_plot_2` from `tests_manual/test_plots`.
+#| out-width: 100%
+render_action_grid("test_plot_2", legacy=False)
+```
+
+Interpretation:
+
+- As target intervals narrow, weighted methods move closer to the underlying raw data values.
+- `Average` can still differ from length-weighted methods because each overlapping row counts equally, regardless of overlap size.
+
+### Case 3: missing values inside the source stream
+
+This scenario demonstrates null handling. The `NaN` source row is ignored per action rather than forcing the whole target row to become null.
+
+```{python}
+#| label: fig-case-3
+#| fig-cap: Case 3 reproduces `test_plot_3` from `tests_manual/test_plots` and includes missing source values.
+#| out-width: 100%
+render_action_grid("test_plot_3", legacy=False)
+```
+
+Interpretation:
+
+- Missing source values are dropped before the reduction is computed.
+- The weighted percentile still operates on the remaining sorted values and their overlap lengths.
+- A target row becomes `NaN` only when there is no overlapping non-null contribution for that action.
+
+### Case 4: compact three-by-three example
+
+This is the clearest short example for understanding how `First`, `KeepLongest`, and the weighted methods diverge.
+
+```{python}
+#| label: fig-case-4
+#| fig-cap: Case 4 reproduces `test_plot_4` from `tests_manual/test_plots`.
+#| out-width: 100%
+render_action_grid("test_plot_4", legacy=False)
+```
+
+Interpretation:
+
+- The center source row dominates overlap in the middle target interval, so `KeepLongest` selects it even when another row touches the target.
+- `First` reports whichever overlapping row appears first in source order, not the numerically largest or longest one.
+
+### Case 5: one long target over several source intervals
+
+This case is a good mental model for corridor-level reporting where many shorter observations are merged onto one long management segment.
+
+```{python}
+#| label: fig-case-5
+#| fig-cap: Case 5 reproduces `test_plot_5` from `tests_manual/test_plots`.
+#| out-width: 100%
+render_action_grid("test_plot_5", legacy=False)
+```
+
+Interpretation:
+
+- `LengthWeightedAverage` gives a corridor-wide mean.
+- `KeepLongest` reports the dominant categorical state over the corridor.
+- `SumProportionOfData` is the right mental model when the source values represent totals attached to the source rows.
+
+## Validation And Error Model
+
+The public merge helpers share a common validation layer before any expensive overlap work begins.
+
+### Structural requirements
+
+1. `target` and `data` must be pandas DataFrames.
+2. Neither frame may use a `MultiIndex` for rows or columns.
+3. Indices and column names must be unique.
+4. All `join_left` columns and both `from_to` columns must exist in both frames.
+5. Zero-length rows where `from == to` are rejected.
+6. Requested output names may not collide with existing target columns.
+7. Numeric-only aggregations require numeric source dtypes.
+
+### Developer-facing exceptions
+
+| Exception | Trigger |
+| --- | --- |
+| `InvalidDataFrameError` | Non-DataFrame input or unsupported index structure |
+| `DuplicateLabelError` | Duplicate row index or duplicate column labels |
+| `InvalidJoinConfigurationError` | Missing `join_left` or interval columns |
+| `ZeroLengthSegmentError` | A source or target interval has zero length |
+| `OutputCollisionError` | An action would create a column that already exists in `target` |
+| `InvalidAggregationError` | Aggregation is incompatible with the source dtype |
+| `PercentileConfigurationError` | Invalid or missing percentile parameter |
+
+For contributors, the validation code lives in `_validation.py`, and the named exception classes live in `exceptions.py`. Raising the specific exception types is preferred over generic `Exception` in new code because it keeps debugging and test assertions precise.
+
+## Dispatch, Performance, And Developer Notes
+
+### Backend selection
+
+The implementation family is now easiest to think of as a dispatcher plus three concrete backends:
+
+1. `on_slk_intervals(..., legacy=True)` routes to the original row-by-row implementation.
+2. `on_slk_intervals(..., legacy=False)` routes to the fastest available backend.
+3. The fast route prefers `on_slk_intervals_numba()` when Numba is available.
+4. Otherwise it uses `on_slk_intervals_optimized()`, which builds dense overlap matrices per join group.
+5. If categorical `KeepLongest()` inputs are detected, the optimized path delegates to `on_slk_intervals_fallback()` to preserve stable categorical behavior.
+
+### Practical guidance
+
+- Prefer `legacy=False` for throughput-sensitive production code.
+- Prefer `on_slk_intervals_auto()` when you want runtime switching through `MERGE_SEGMENTS_DEFAULT_MODE=optimized` or `legacy`.
+- Prefer direct backend calls only in benchmarks, backend-specific tests, or debugging sessions.
+- Do not call internal helpers from `_validation.py` outside package development; they are implementation details.
+
+### Performance logger
+
+The library can emit timing metrics through `configure_performance_logger()`.
+
+```python
+def log_metrics(event: str, metrics: dict[str, float]) -> None:
+    print(event, metrics)
+
+configure_performance_logger(log_metrics)
+```
+
+For ad hoc diagnostics, `MERGE_SEGMENTS_PERF_LOG=stdout` also enables a built-in stdout logger during process startup.
+
+### Environment-sensitive helpers
+
+- `is_numba_available()` reports whether the Numba backend is available.
+- `on_slk_intervals_auto()` consults `MERGE_SEGMENTS_DEFAULT_MODE` when `prefer_optimized` is omitted.
+
+The current render environment reports Numba availability below.
+
+```{python}
+#| label: tbl-numba
+#| tbl-cap: Runtime backend availability in the environment used to render this document
+pd.DataFrame(
+    [{
+        "numba_available": is_numba_available(),
+        "recommended_entry_point": "on_slk_intervals(..., legacy=False)",
+    }]
+)
+```
+
+## Contributor Checklist
+
+1. Add new public behavior through `Action`, `Aggregation`, or one of the documented merge entry points.
+2. Extend `_validation.py` when a new invariant should fail early.
+3. Prefer explicit exception classes from `exceptions.py` for new failure modes.
+4. Benchmark changes against both the legacy and fast paths when modifying overlap logic.
+5. Keep categorical behavior stable, especially for `KeepLongest()` tie handling.
+
+## Summary
+
+Use `on_slk_intervals(..., legacy=False)` as the default modern entry point, choose aggregations based on the physical meaning of the source values, and read the plot suite as a visual reminder that weighted, ordered, categorical, and total-preserving reductions answer different questions. The rendered figures in this document are the same scenario family used by the repository's manual plot tests, but generated fresh during Quarto execution.
