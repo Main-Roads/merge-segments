@@ -56,7 +56,7 @@ This fork was created by Main Roads Western Australia to:
 | **Installation** | `pip install merge_segments` | `python -m pip install git+https://github.com/Main-Roads/merge-segments.git` |
 | **Optimized Path** | Legacy implementation only | Legacy + vectorized optimized implementation |
 | **CI/CD** | Basic | Comprehensive (linting, type-checking, testing, wheels) |
-| **Type Hints** | Partial | Full mypy compliance with `py.typed` |
+| **Type Hints** | Partial | Project-level pyright checks with `py.typed` |
 | **Documentation** | Original README | Extended with performance guides and migration notes |
 
 ### Choosing Between Versions
@@ -571,13 +571,12 @@ Latest release: **1.1.0** (2025-12-22).
 ### 5.3. Static Type Checking
 
 The distribution includes inline type hints and a `py.typed` marker so type
-checkers recognise the package as typed. A MyPy configuration (see
-`[tool.mypy]` in `pyproject.toml`) targets the `merge_segments` package and
-enables optional static analysis via:
+checkers recognise the package as typed. A repository `pyrightconfig.json`
+targets the `merge_segments` package and enables optional static analysis via:
 
 ```powershell
-python -m pip install mypy
-python -m mypy src/merge_segments
+python -m pip install "pyright[nodejs]"
+python -m pyright src/merge_segments
 ```
 
 ## 6. Performance & Controls

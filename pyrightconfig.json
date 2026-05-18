@@ -1,0 +1,14 @@
+{
+  "include": [
+    "src/merge_segments"
+  ],
+  "pythonVersion": "3.13",
+  "typeCheckingMode": "basic",
+  "reportMissingModuleSource": "none",
+  "reportArgumentType": "none",
+  "reportAssignmentType": "none",
+  "reportAttributeAccessIssue": "none",
+  "reportOptionalSubscript": "none",
+  "reportOptionalMemberAccess": "none",
+  "reportPossiblyUnboundVariable": "none"
+}
