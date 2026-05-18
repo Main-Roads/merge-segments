@@ -5,16 +5,34 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Iterable, List, Sequence, Tuple
 
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
 
 if TYPE_CHECKING:
     from .merge import Action
 
 from .exceptions import (
     DuplicateLabelError,
+    InvalidAggregationError,
     InvalidDataFrameError,
     InvalidJoinConfigurationError,
     OutputCollisionError,
     ZeroLengthSegmentError,
+)
+
+
+_NUMERIC_ONLY_AGGREGATIONS = frozenset(
+    {
+        "Average",
+        "LengthWeightedAverage",
+        "LengthWeightedPercentile",
+        "SumProportionOfData",
+        "SumProportionOfTarget",
+        "Sum",
+        "IndexOfMax",
+        "IndexOfMin",
+        "Min",
+        "Max",
+    }
 )
 
 
@@ -124,3 +142,31 @@ def ensure_output_columns_available(
                     f"'{action.column_name}' as '{rename}' into target because the "
                     f"target already contains a column named '{rename}'."
                 )
+
+
+def ensure_aggregation_column_types(
+    data: pd.DataFrame,
+    actions: Sequence["Action"],
+) -> None:
+    """Ensure aggregation strategies are compatible with source dtypes."""
+
+    invalid_messages: List[str] = []
+    for action in actions:
+        column_name = action.column_name
+        if column_name not in data.columns:
+            continue
+
+        aggregation_name = action.aggregation.type.name
+        if aggregation_name not in _NUMERIC_ONLY_AGGREGATIONS:
+            continue
+
+        series = data[column_name]
+        if not is_numeric_dtype(series):
+            invalid_messages.append(
+                "Aggregation "
+                f"'{aggregation_name}' requires numeric data in column '{column_name}' "
+                f"(dtype: {series.dtype})."
+            )
+
+    if invalid_messages:
+        raise InvalidAggregationError("\n".join(invalid_messages))

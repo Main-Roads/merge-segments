@@ -223,7 +223,7 @@ assert result.compare(
 
 ```
 
-To use the optimized implementation, set `legacy=False`:
+To use the fastest available optimized implementation, set `legacy=False`:
 
 ```python
 result = merge.on_slk_intervals(
@@ -235,9 +235,13 @@ result = merge.on_slk_intervals(
         merge.Action("pavement_type",   merge.Aggregation.KeepLongest())
     ],
     from_to=("slk_from", "slk_to"),
-    legacy=False  # Use optimized implementation
+    legacy=False  # Prefer the numba-backed path when available
 )
 ```
+
+When Numba is installed, `legacy=False` uses the sparse Numba-backed merge
+implementation automatically. Without Numba, it falls back to the vectorised
+optimized implementation.
 
 For debugging or diagnostic purposes, enable verbose output with `verbose=True`:
 
@@ -283,10 +287,10 @@ result = merge.on_slk_intervals_optimized(
 )
 ```
 
-Use the optimized implementation (via `legacy=False` or by calling
-`on_slk_intervals_optimized()` directly) when you need shorter runtimes and are
-able to perform additional validation in your environment; otherwise prefer the
-legacy implementation for its battle-tested reliability.
+Use the optimized implementation (via `legacy=False` or
+`on_slk_intervals_auto()`) when you need shorter runtimes and are able to
+perform additional validation in your environment; otherwise prefer the legacy
+implementation for its battle-tested reliability.
 
 | Parameter      | Type                 | Note                                                                                                                                                                                                                                                                                                              |
 | -------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -344,6 +348,11 @@ The following merge aggregations are supported:
 | `merge.Aggregation.Max()`                                     | The maximum value in `data` which overlaps the segment in `target`.                                                                                                                                                              |
 | `merge.Aggregation.IndexOfMin()`                              | The row-index in the `data` with the minimum value. After merging the index can be used to fetch things like `"Surface Type"` of `"Oldest Surface"` (ie minimum `"Surface Year"`)                                                |
 | `merge.Aggregation.IndexOfMax()`                              | The row-index in the `data` with the maximum value.                                                                                                                                                                              |
+
+Numeric aggregations such as `Average`, `Sum`, `Min`, `Max`,
+`IndexOfMax`, `IndexOfMin`, and the weighted variants require numeric source
+columns. Categorical values are supported by `First`, `KeepLongestSegment`, and
+`KeepLongest`.
 
 #### 3.3.1. Notes about `KeepLongest()`
 
@@ -622,7 +631,7 @@ The module will emit timing messages such as
 ### 6.3. Selecting the Optimized Path
 
 Call `merge.on_slk_intervals_auto` to let the library choose between the
-optimized and legacy helpers:
+fastest available optimized helper and the legacy implementation:
 
 ```python
 from merge_segments import merge
@@ -638,7 +647,9 @@ result = merge.on_slk_intervals_auto(
 
 Set `prefer_optimized=False` to force the legacy path for a single call, or set
 `MERGE_SEGMENTS_DEFAULT_MODE=legacy` (or `optimized`) to configure the default
-mode for the current process.
+mode for the current process. When optimization is enabled and Numba is
+installed, `on_slk_intervals_auto` will use the sparse Numba backend before
+falling back to the dense vectorized implementation.
 
 ### 6.4. Validating Optimized Outputs
 

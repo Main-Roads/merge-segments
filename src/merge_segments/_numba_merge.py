@@ -7,7 +7,8 @@ JIT compilation, this approach is 20-100x faster than the legacy implementation
 and can handle datasets that would cause OOM errors with the dense matrix approach.
 
 Memory complexity: O(actual_overlaps) instead of O(n_target × n_data)
-Time complexity: O((n + m) log(n + m)) for interval intersection
+Time complexity: sparse-overlap workloads are much faster than the dense matrix
+path, but worst-case scanning can still approach O(n_target × n_data)
 
 Requires: numba>=0.57
 """
@@ -19,6 +20,8 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
+
+from . import _validation as validation
 
 try:
     from numba import njit, prange
@@ -723,6 +726,15 @@ def on_slk_intervals_numba(
     # Validate inputs
     if not isinstance(join_left, list):
         raise TypeError("`join_left` must be a list of column names.")
+    target = validation.ensure_dataframe("target", target)
+    data = validation.ensure_dataframe("data", data)
+    validation.ensure_simple_index("target", target)
+    validation.ensure_simple_index("data", data)
+    validation.ensure_required_columns(target, data, join_left, from_to)
+    validation.ensure_nonzero_lengths("target", target, slk_from, slk_to)
+    validation.ensure_nonzero_lengths("data", data, slk_from, slk_to)
+    validation.ensure_output_columns_available(target.columns, column_actions)
+    validation.ensure_aggregation_column_types(data, column_actions)
 
     # Initialize output columns with appropriate dtypes
     output_data: Dict[str, np.ndarray] = {}
