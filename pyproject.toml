@@ -48,7 +48,10 @@ dev = [
 
 
 [build-system]
-requires = ["hatchling"]
+requires = [
+  "hatchling>=1.24",
+  "pathspec>=0.11"
+]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.sdist]
