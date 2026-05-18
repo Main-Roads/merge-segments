@@ -8,7 +8,7 @@ dist/
 Thumbs.db
 .pytest_cache/
 .venv/
-*.pdf
+
 ephemeral/
 .nox/
 .*_cache/
