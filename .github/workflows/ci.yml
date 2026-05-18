@@ -61,8 +61,8 @@ jobs:
         run: |
           uv sync --extra dev
 
-      - name: Run mypy
-        run: uv run python -m mypy src/merge_segments
+      - name: Run pyright
+        run: uv run python -m pyright src/merge_segments
 
   tests:
     name: Tests (Python ${{ matrix.python-version }})
