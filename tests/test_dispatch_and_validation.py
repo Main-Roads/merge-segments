@@ -88,7 +88,9 @@ def test_on_slk_intervals_auto_uses_numba_when_available(monkeypatch):
         return sentinel
 
     def fail_optimized(**kwargs):
-        raise AssertionError("optimized path should not be used when numba is available")
+        raise AssertionError(
+            "optimized path should not be used when numba is available"
+        )
 
     monkeypatch.setattr(merge, "is_numba_available", lambda: True)
     monkeypatch.setattr(merge, "on_slk_intervals_numba", fake_numba)
