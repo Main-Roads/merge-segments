@@ -6,7 +6,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-- Nothing yet.
+### Added
+- Quarto-based theory and developer guide covering interval merge mathematics, API selection, aggregation behavior, and rendered HTML/PDF documentation outputs.
+- Regression tests covering fast-path dispatch, aggregation dtype validation, and categorical `KeepLongest()` tie behavior.
+
+### Changed
+- `on_slk_intervals(..., legacy=False)` and `on_slk_intervals_auto()` now route through the same fastest-available fast path, preferring the Numba backend when available.
+- Numeric-only aggregations now fail early with `InvalidAggregationError` when used on non-numeric source columns.
+- `KeepLongest()` now uses stable first-seen tie-breaking across the legacy and categorical fallback paths.
+- Improved fast-path performance on the 5,000 target / 15,000 data / 5-group benchmark: auto-dispatch dropped from about `0.97s` to `0.03s` when Numba is available, and the dense optimized path runs at about `0.59s` versus `18.87s` for the legacy path.
+
+### Fixed
+- Removed the broad silent fallback from the fast path so optimized-backend failures surface instead of being masked.
 
 ## [1.1.0] - 2025-12-22
 
