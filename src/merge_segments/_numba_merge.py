@@ -47,7 +47,7 @@ except ImportError:
 # =============================================================================
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _find_overlapping_intervals_sorted(
     tgt_starts: np.ndarray,
     tgt_ends: np.ndarray,
@@ -491,7 +491,7 @@ def _aggregate_single_target(
     return np.nan
 
 
-@njit(cache=True, parallel=True)
+@njit(cache=True, nogil=True)
 def _aggregate_all_targets_numeric(
     n_targets: int,
     tgt_indices: np.ndarray,
@@ -505,7 +505,16 @@ def _aggregate_all_targets_numeric(
     percentile: float,
 ) -> np.ndarray:
     """
-    Aggregate all targets in parallel for a single numeric column.
+    Aggregate all targets for a single numeric column.
+
+    Note: this is called once per (group, action) pair -- often thousands of
+    times per merge, each call covering only a small number of targets. Numba's
+    ``parallel=True`` (prange) was benchmarked here and found to be a net loss:
+    spinning up its internal thread team on every one of these small calls costs
+    more in synchronization overhead than the parallel loop saves (~3x slower,
+    2.9M-row benchmark: 12.2s vs 4.5s without it). ``nogil=True`` is kept
+    because it enables real multi-core speedup when this function is called
+    concurrently from multiple Python threads, as the Polars backend does.
 
     Args:
         n_targets: Number of target rows
@@ -551,8 +560,8 @@ def _aggregate_all_targets_numeric(
         grouped_overlaps[pos] = overlap_lens[i]
         current_pos[t] += 1
 
-    # Parallel aggregation across targets
-    for t in prange(n_targets):
+    # Sequential aggregation across targets (see note above re: parallel=True)
+    for t in range(n_targets):
         start = offsets[t]
         end = offsets[t + 1]
 

@@ -18,6 +18,10 @@ coverage.xml
 htmlcov/
 
 check_code.bat
+check_code.sh
 
 *.xml
 nox*.py
+
+tests_manual/test_large_sample_backends.py
+tests_manual/bench_large_dataset.py

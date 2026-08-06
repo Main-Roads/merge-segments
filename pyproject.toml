@@ -1,6 +1,6 @@
 [project]
 name = "merge_segments"
-version = "1.1.0"
+version = "1.2.0"
 authors = [
   {name="Nicholas Archer"},
 ]
@@ -34,9 +34,17 @@ plotting = [
 performance = [
   "numba>=0.57",
 ]
+polars = [
+  "polars>=1.0",
+]
+dask = [
+  "dask[dataframe]>=2024.1",
+]
 dev = [
   "pytest>=8.4",
   "pytest-cov>=5.0",
+  "polars>=1.0",
+  "dask[dataframe]>=2024.1",
   "pyright[nodejs]>=1.1",
   "ruff>=0.14",
   "pre-commit>=4.3",
@@ -52,6 +60,15 @@ requires = [
   "pathspec>=0.11"
 ]
 build-backend = "hatchling.build"
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+# Pin the rule set explicitly so behaviour doesn't drift with the installed
+# ruff version. E4/E7/E9/F is ruff's own long-standing default selection
+# (pycodestyle errors + Pyflakes).
+select = ["E4", "E7", "E9", "F"]
 
 [tool.hatch.build.targets.sdist]
 exclude = [

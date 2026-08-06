@@ -974,29 +974,109 @@ def on_slk_intervals_optimized(
     return merged
 
 
+def _detect_dataframe_backend(target: object, data: object) -> str:
+    """Detect whether inputs are pandas, polars, or dask DataFrames.
+
+    Returns "pandas", "polars", or "dask". Raises ``TypeError`` if `target`
+    and `data` belong to different backends.
+    """
+
+    def _backend_of(frame: object) -> Optional[str]:
+        if isinstance(frame, pd.DataFrame):
+            return "pandas"
+        try:
+            import polars as pl
+
+            if isinstance(frame, (pl.DataFrame, pl.LazyFrame)):
+                return "polars"
+        except ImportError:
+            pass
+        try:
+            import dask.dataframe as dd
+
+            if isinstance(frame, dd.DataFrame):
+                return "dask"
+        except ImportError:
+            pass
+        return None
+
+    target_backend = _backend_of(target)
+    data_backend = _backend_of(data)
+
+    if target_backend is None or data_backend is None:
+        # Fall through to pandas validation, which will raise a clear,
+        # consistent InvalidDataFrameError for unsupported types.
+        return "pandas"
+
+    if target_backend != data_backend:
+        raise TypeError(
+            "`target` and `data` must be the same DataFrame type. Got "
+            f"target={target_backend!r} ({type(target)}) and "
+            f"data={data_backend!r} ({type(data)})."
+        )
+
+    return target_backend
+
+
 def on_slk_intervals_auto(
-    target: pd.DataFrame,
-    data: pd.DataFrame,
+    target: Any,
+    data: Any,
     join_left: List[str],
     column_actions: List[Action],
     from_to: Tuple[str, str],
     prefer_optimized: Optional[bool] = None,
-) -> pd.DataFrame:
-    """Dispatch to the optimized or legacy merge implementation.
+) -> Any:
+    """Dispatch to the appropriate merge backend and implementation.
+
+    In addition to pandas DataFrames, `target` and `data` may both be Polars
+    DataFrames or both be Dask DataFrames -- the input type is detected
+    automatically and routed to the matching backend
+    (:func:`~merge_segments._polars_merge.on_slk_intervals_polars` or
+    :func:`~merge_segments._dask_merge.on_slk_intervals_dask`). Mixing
+    backends between `target` and `data` raises ``TypeError``.
 
     Args:
         target, data, join_left, column_actions, from_to: See
-            :func:`on_slk_intervals` for parameter descriptions.
+            :func:`on_slk_intervals` for parameter descriptions. `target` and
+            `data` may be pandas, Polars, or Dask DataFrames (both must be the
+            same type).
         prefer_optimized: When ``True`` the fastest available optimized path is
             used, when ``False`` the legacy implementation is enforced. If
             ``None`` (default), the behaviour is controlled by the
             ``MERGE_SEGMENTS_DEFAULT_MODE`` environment variable
             (``"optimized"`` or ``"legacy"``). When the variable is unset the
-            optimized implementation is preferred.
+            optimized implementation is preferred. This parameter only applies
+            to the pandas backend; Polars and Dask always use their optimized
+            (Numba-backed) paths.
 
     Returns:
-        The merged DataFrame produced by either the optimized or legacy helper.
+        The merged DataFrame, in the same type as the input (pandas, Polars,
+        or a lazy Dask DataFrame).
     """
+
+    backend = _detect_dataframe_backend(target, data)
+
+    if backend == "polars":
+        from ._polars_merge import on_slk_intervals_polars
+
+        return on_slk_intervals_polars(
+            target=target,
+            data=data,
+            join_left=join_left,
+            column_actions=column_actions,
+            from_to=from_to,
+        )
+
+    if backend == "dask":
+        from ._dask_merge import on_slk_intervals_dask
+
+        return on_slk_intervals_dask(
+            target=target,
+            data=data,
+            join_left=join_left,
+            column_actions=column_actions,
+            from_to=from_to,
+        )
 
     if prefer_optimized is None:
         mode = os.getenv("MERGE_SEGMENTS_DEFAULT_MODE")

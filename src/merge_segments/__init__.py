@@ -18,21 +18,27 @@ from .merge import (  # noqa: F401 - re-exported for convenience
     on_slk_intervals_numba,
     on_slk_intervals_optimized,
 )
+from ._polars_merge import is_polars_available, on_slk_intervals_polars  # noqa: F401
+from ._dask_merge import is_dask_available, on_slk_intervals_dask  # noqa: F401
 
 try:
     __version__ = version("merge_segments")
 except PackageNotFoundError:  # pragma: no cover - during local editing
-    __version__ = "1.1.0"
+    __version__ = "1.2.0"
 
 __all__ = [
     "Action",
     "Aggregation",
     "configure_performance_logger",
     "is_numba_available",
+    "is_polars_available",
+    "is_dask_available",
     "on_slk_intervals",
     "on_slk_intervals_auto",
     "on_slk_intervals_fallback",
     "on_slk_intervals_numba",
     "on_slk_intervals_optimized",
+    "on_slk_intervals_polars",
+    "on_slk_intervals_dask",
     "__version__",
 ]
